@@ -72,5 +72,7 @@ private:
  std::array<noori::TempoPoint,16384> capturedTempo{};std::size_t tempoCount=0;
  std::atomic<bool> captureStopped{false};
  double deviceRate=48000;
+ const noori::Audio* activeBuffer=nullptr;const noori::Audio* transitionBuffer=nullptr;
+ noori::Sample bufferOrigin=0,transitionOrigin=0;int crossfadeRemaining=0;
  JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(NooriProcessor)
 };

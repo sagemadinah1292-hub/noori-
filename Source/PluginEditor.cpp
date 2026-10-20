@@ -35,6 +35,7 @@ void NooriEditor::timerCallback(){
 #endif
  const bool busy=session->busy;bool has=session->original!=nullptr;
  for(auto* b:{&analyseButton,&alignButton,&selectedButton,&exportButton,&compareButton})b->setEnabled(has&&!busy);
+ selectedButton.setEnabled(has&&!busy&&std::any_of(session->attacks.begin(),session->attacks.end(),[](const auto& a){return a.selected;}));
  undoButton.setEnabled(session->canUndo());redoButton.setEnabled(session->canRedo());
  bool ara=false;
 #if JucePlugin_Enable_ARA

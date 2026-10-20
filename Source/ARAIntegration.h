@@ -6,7 +6,7 @@ public:
  NooriModification(juce::ARAAudioSource*,ARA::ARAAudioModificationHostRef,const juce::ARAAudioModification*);
  ~NooriModification()override;
  std::shared_ptr<EditSession> session;
- bool needsLoad=true;
+ bool needsLoad=true,needsTimeline=true;
 };
 std::shared_ptr<EditSession> selectedARASession(NooriProcessor&);
 #endif

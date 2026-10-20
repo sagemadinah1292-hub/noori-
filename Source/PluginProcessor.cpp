@@ -83,7 +83,7 @@ void EditSession::restore(const void* data,std::size_t size,bool includeAudio) {
 }
 NooriProcessor::NooriProcessor():AudioProcessor(BusesProperties().withInput("Vocal input",juce::AudioChannelSet::stereo(),true).withOutput("Output",juce::AudioChannelSet::stereo(),true)),insertSession(std::make_shared<EditSession>()){}
 NooriProcessor::~NooriProcessor(){captureArmed=false;}
-void NooriProcessor::prepareToPlay(double sr,int block){deviceRate=sr;captureArmed=false;capture={sr,std::vector<std::vector<float>>((std::size_t)getTotalNumInputChannels(),std::vector<float>((std::size_t)(sr*120),0))};
+void NooriProcessor::prepareToPlay(double sr,int block){deviceRate=sr;captureArmed=false;activeBuffer=nullptr;transitionBuffer=nullptr;crossfadeRemaining=0;capture={sr,std::vector<std::vector<float>>((std::size_t)getTotalNumInputChannels(),std::vector<float>((std::size_t)(sr*120),0))};
 #if JucePlugin_Enable_ARA
  prepareToPlayForARA(sr,block,getTotalNumOutputChannels(),getProcessingPrecision());
 #else
@@ -113,19 +113,22 @@ void NooriProcessor::processBlock(juce::AudioBuffer<float>& buffer,juce::MidiBuf
    if(!captureStopped){for(int c=0;c<buffer.getNumChannels();++c)std::memcpy(capture.channels[(std::size_t)c].data()+n,buffer.getReadPointer(c),(std::size_t)block*sizeof(float));expectedSample=start+block;captureCount.store(n+block,std::memory_order_release);}
   }
  }
- if(audition) {
-  const auto* a=insertSession->compare.load()?insertSession->originalAudible.load():insertSession->audible.load(std::memory_order_acquire);
-  if(a&&std::abs(a->sampleRate-deviceRate)<.1&&a->channels.size()==(std::size_t)buffer.getNumChannels()) {
-   auto at=hostSample.load()-insertSession->realtimeOrigin.load();
-   for(int c=0;c<buffer.getNumChannels();++c)for(int i=0;i<block;++i)buffer.setSample(c,i,playing&&at+i>=0&&at+i<a->length()?a->channels[(std::size_t)c][(std::size_t)(at+i)]:0);
-  }
+ const auto* desired=audition?(insertSession->compare.load()?insertSession->originalAudible.load():insertSession->audible.load(std::memory_order_acquire)):nullptr;
+ if(desired&&(std::abs(desired->sampleRate-deviceRate)>.1||desired->channels.empty()))desired=nullptr;
+ auto desiredOrigin=insertSession->realtimeOrigin.load();
+ if(desired!=activeBuffer||(desired&&desiredOrigin!=bufferOrigin)){transitionBuffer=activeBuffer;transitionOrigin=bufferOrigin;activeBuffer=desired;bufferOrigin=desiredOrigin;crossfadeRemaining=256;}
+ if(activeBuffer||crossfadeRemaining>0){
+  auto read=[&](const noori::Audio* a,noori::Sample origin,int c,int i,float dry){if(!a)return dry;auto at=hostSample.load()-origin+i;if(!playing||at<0||at>=a->length())return 0.f;auto value=a->channels[(std::size_t)std::min(c,(int)a->channels.size()-1)][(std::size_t)at];if(buffer.getNumChannels()==1&&a->channels.size()==2)value=.5f*(a->channels[0][(std::size_t)at]+a->channels[1][(std::size_t)at]);return value;};
+  for(int c=0;c<buffer.getNumChannels();++c)for(int i=0;i<block;++i){float dry=buffer.getSample(c,i);float value=read(activeBuffer,bufferOrigin,c,i,dry);if(i<crossfadeRemaining){float previous=read(transitionBuffer,transitionOrigin,c,i,dry);double mix=.5-.5*std::cos(3.141592653589793*(256-crossfadeRemaining+i+1)/256);value=float(previous*(1-mix)+value*mix);}buffer.setSample(c,i,value);}
+  crossfadeRemaining=std::max(0,crossfadeRemaining-block);
  }
+
 }
 void NooriProcessor::beginCapture(){if(insertSession->busy)return;suspendProcessing(true);captureCount=0;tempoCount=0;captureStopped=false;audition=false;captureArmed=true;suspendProcessing(false);}
 void NooriProcessor::finishCapture(){suspendProcessing(true);captureArmed=false;auto n=captureCount.load();if(n>0){auto a=std::make_shared<noori::Audio>();a->sampleRate=deviceRate;a->channels.resize(capture.channels.size());for(std::size_t c=0;c<a->channels.size();++c)a->channels[c].assign(capture.channels[c].begin(),capture.channels[c].begin()+n);std::vector<noori::TempoPoint> map(capturedTempo.begin(),capturedTempo.begin()+(std::ptrdiff_t)tempoCount);insertSession->load([a]{return *a;},"Captured vocal",captureOrigin,noori::Timeline(deviceRate,map));}suspendProcessing(false);}
 juce::String NooriProcessor::captureStatus()const {return captureStopped?"Capture paused: seek, loop, tempo capacity, or 120 s limit. Press Finish.":"Capturing when Cubase plays: "+juce::String(captureCount.load()/deviceRate,1)+" s";}
 void NooriProcessor::importFile(const juce::File& file){auto start=hostSample.load();auto rate=deviceRate;auto b=bpm.load();auto q=quarter.load();insertSession->load([file,rate]{juce::AudioFormatManager formats;formats.registerBasicFormats();std::unique_ptr<juce::AudioFormatReader> r(formats.createReaderFor(file));if(!r)throw std::runtime_error("Cannot read this audio file");if(r->numChannels<1||r->numChannels>2||r->lengthInSamples<1||r->lengthInSamples*(juce::int64)r->numChannels*4>128*1024*1024)throw std::runtime_error("Use a mono/stereo file smaller than 128 MiB decoded");if(std::abs(r->sampleRate-rate)>.1)throw std::runtime_error("File sample rate must match the Cubase project");juce::AudioBuffer<float> buffer((int)r->numChannels,(int)r->lengthInSamples);if(!r->read(&buffer,0,buffer.getNumSamples(),0,true,true))throw std::runtime_error("Audio read failed");noori::Audio a;a.sampleRate=r->sampleRate;for(int c=0;c<buffer.getNumChannels();++c)a.channels.emplace_back(buffer.getReadPointer(c),buffer.getReadPointer(c)+buffer.getNumSamples());return a;},file.getFileName(),start,noori::Timeline(rate,{{start,b,q}}));}
-void NooriProcessor::exportFile(const juce::File& file,std::shared_ptr<EditSession> s){if(!s->displayed()||s->busy)return;auto* a=s->displayed();juce::WavAudioFormat format;juce::TemporaryFile temporary(file);auto stream=temporary.getFile().createOutputStream();if(!stream){s->status="Cannot create export file";return;}std::unique_ptr<juce::AudioFormatWriter> writer(format.createWriterFor(stream.release(),a->sampleRate,(unsigned)a->channels.size(),24,{},0));if(!writer){s->status="Cannot create 24-bit WAV writer";return;}std::vector<const float*> ptr;for(const auto& c:a->channels)ptr.push_back(c.data());bool ok=writer->writeFromFloatArrays(ptr.data(),(int)ptr.size(),(int)a->length());writer.reset();s->status=ok&&temporary.overwriteTargetFileWithTemporary()?"Exported 24-bit WAV":"WAV write failed";}
+void NooriProcessor::exportFile(const juce::File& file,std::shared_ptr<EditSession> s){if(!s->audible.load()||s->busy)return;auto* a=s->audible.load();juce::WavAudioFormat format;juce::TemporaryFile temporary(file);auto stream=temporary.getFile().createOutputStream();if(!stream){s->status="Cannot create export file";return;}std::unique_ptr<juce::AudioFormatWriter> writer(format.createWriterFor(stream.release(),a->sampleRate,(unsigned)a->channels.size(),24,{},0));if(!writer){s->status="Cannot create 24-bit WAV writer";return;}std::vector<const float*> ptr;for(const auto& c:a->channels)ptr.push_back(c.data());bool ok=writer->writeFromFloatArrays(ptr.data(),(int)ptr.size(),(int)a->length());writer.reset();s->status=ok&&temporary.overwriteTargetFileWithTemporary()?"Exported 24-bit WAV":"WAV write failed";}
 juce::AudioProcessorEditor* NooriProcessor::createEditor(){return new NooriEditor(*this);}
 void NooriProcessor::getStateInformation(juce::MemoryBlock& block){block=insertSession->archive(true);}
 void NooriProcessor::setStateInformation(const void* data,int bytes){if(bytes>0)insertSession->restore(data,(std::size_t)bytes,true);}

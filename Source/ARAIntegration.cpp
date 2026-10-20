@@ -18,10 +18,11 @@ class NooriRenderer final : public ARAPlaybackRenderer {
 public:
  NooriRenderer(ARA::PlugIn::DocumentController* dc,ReadWriteLock& l):ARAPlaybackRenderer(dc),lock(l),readerThread("Noori ARA read-ahead"){readerThread.startThread();}
  void prepareToPlay(double sr,int block,int channels,AudioProcessor::ProcessingPrecision,AlwaysNonRealtime)override {
-  rate=sr;temp.setSize(channels,block);readers.clear();
+  rate=sr;temp.setSize(channels,block);readers.clear();transitions.clear();
+  for(auto* r:getPlaybackRegions())transitions.emplace(r,Transition{});
   for(auto* r:getPlaybackRegions()){auto* source=r->getAudioModification()->getAudioSource();if(readers.count(source))continue;auto reader=std::make_unique<ARAAudioSourceReader>(source);auto buffered=std::make_unique<BufferingAudioReader>(reader.release(),readerThread,(int)(source->getSampleRate()*2));buffered->setReadTimeout(0);readers.emplace(source,std::move(buffered));}
  }
- void releaseResources()override{readers.clear();temp.setSize(0,0);}
+ void releaseResources()override{readers.clear();transitions.clear();temp.setSize(0,0);}
  bool processBlock(AudioBuffer<float>& b,AudioProcessor::Realtime realtime,const AudioPlayHead::PositionInfo& pos)noexcept override {
   b.clear();ScopedTryReadLock guard(lock);if(!guard.isLocked()||!pos.getIsPlaying())return true;
   auto blockStart=pos.getTimeInSamples().orFallback(0);
@@ -36,10 +37,14 @@ public:
    const double sourceRate=source->getSampleRate();
    const double offset=r->getStartInAudioModificationTime()-r->getStartInPlaybackTime();
    if(audio) {
+    auto stateIt=transitions.find(r);Transition* state=stateIt==transitions.end()?nullptr:&stateIt->second;
+    if(state&&state->current!=audio){state->previous=state->current;state->current=audio;state->remaining=state->previous?256:0;}
+    auto sample=[&](const noori::Audio* a,int c,double x){auto at=(noori::Sample)std::floor(x);double frac=x-at;const auto& samples=a->channels[(std::size_t)std::min(c,(int)a->channels.size()-1)];if(at>=0&&at+1<a->length())return float(samples[(std::size_t)at]*(1-frac)+samples[(std::size_t)(at+1)]*frac);return at==a->length()-1?samples.back():0.f;};
     for(int c=0;c<b.getNumChannels();++c) {
-     const auto& src=audio->channels[(std::size_t)std::min(c,(int)audio->channels.size()-1)];auto* dst=b.getWritePointer(c);
-     for(int i=first;i<last;++i){double x=((blockStart+i)/rate+offset)*sourceRate;auto at=(noori::Sample)std::floor(x);double frac=x-at;if(at>=0&&at+1<audio->length())dst[i]+=float(src[(std::size_t)at]*(1-frac)+src[(std::size_t)(at+1)]*frac);else if(at==audio->length()-1)dst[i]+=src.back();}
+     auto* dst=b.getWritePointer(c);
+     for(int i=first;i<last;++i){double x=((blockStart+i)/rate+offset)*sourceRate;float value=sample(audio,c,x);if(state&&i-first<state->remaining){double mix=.5-.5*std::cos(3.141592653589793*(256-state->remaining+i-first+1)/256);value=float(sample(state->previous,c,x)*(1-mix)+value*mix);}dst[i]+=value;}
     }
+    if(state)state->remaining=std::max(0,state->remaining-(last-first));
    } else if(std::abs(sourceRate-rate)<.1) {
     auto it=readers.find(source);if(it==readers.end()||temp.getNumSamples()<last-first)continue;
     it->second->setReadTimeout(realtime==AudioProcessor::Realtime::no?1000:0);
@@ -51,6 +56,8 @@ public:
  }
  using ARAPlaybackRenderer::processBlock;
 private:
+ struct Transition{const noori::Audio* current=nullptr;const noori::Audio* previous=nullptr;int remaining=0;};
+ std::map<ARAPlaybackRegion*,Transition> transitions;
  ReadWriteLock& lock;double rate=48000;AudioBuffer<float> temp;TimeSliceThread readerThread;
  std::map<ARAAudioSource*,std::unique_ptr<BufferingAudioReader>> readers;
 };
@@ -64,7 +71,9 @@ protected:
  ARAAudioModification* doCreateAudioModification(ARAAudioSource* s,ARA::ARAAudioModificationHostRef ref,const ARAAudioModification* clone)override{return new NooriModification(s,ref,clone);}
  ARAPlaybackRenderer* doCreatePlaybackRenderer()override{return new NooriRenderer(getDocumentController(),lock);}
  void doUpdateAudioSourceContent(ARAAudioSource* s,ARAContentUpdateScopes)override {for(auto* m:s->getAudioModifications<NooriModification>()){m->needsLoad=true;m->session->cancel();}}
- void didUpdatePlaybackRegionProperties(ARAPlaybackRegion* r)override {updateTimeline(r->getAudioModification<NooriModification>(),r);}
+ void didUpdatePlaybackRegionProperties(ARAPlaybackRegion* r)override {r->getAudioModification<NooriModification>()->needsTimeline=true;}
+ void didUpdateAudioSourceProperties(ARAAudioSource* s)override {doUpdateAudioSourceContent(s,ARAContentUpdateScopes::samplesAreAffected());}
+ void doUpdateMusicalContextContent(ARAMusicalContext*,ARAContentUpdateScopes)override {for(auto* s:getDocument()->getAudioSources<ARAAudioSource>())for(auto* m:s->getAudioModifications<NooriModification>())m->needsTimeline=true;}
  bool doStoreObjectsToStream(ARAOutputStream& out,const ARAStoreObjectsFilter* filter)override {
   const auto& mods=filter->getAudioModificationsToStore<NooriModification>();if(!out.writeInt(1)||!out.writeInt((int)mods.size()))return false;
   for(auto* m:mods){auto state=m->session->archive(false);if(!out.writeString(m->getPersistentID())||!out.writeInt64((juce::int64)state.getSize())||!out.write(state.getData(),state.getSize()))return false;}
@@ -95,7 +104,9 @@ private:
   for(auto* source:getDocument()->getAudioSources<ARAAudioSource>()) {
    if(!source->isSampleAccessEnabled())continue;
    for(auto* m:source->getAudioModifications<NooriModification>()) {
-    if(!m->needsLoad||m->session->busy)continue;
+    if(m->session->busy)continue;
+    if(m->needsTimeline&&!m->getPlaybackRegions().empty()){updateTimeline(m,m->getPlaybackRegions().front());m->needsTimeline=false;}
+    if(!m->needsLoad)continue;
     auto n=source->getSampleCount();auto nc=source->getChannelCount();double sr=source->getSampleRate();
     if(n<1||nc<1||nc>2||n*nc*4>128*1024*1024){m->session->status="ARA source exceeds mono/stereo 128 MiB limit";m->needsLoad=false;continue;}
     auto reader=std::shared_ptr<ARAAudioSourceReader>(new ARAAudioSourceReader(source),[](ARAAudioSourceReader* ptr){if(MessageManager::existsAndIsCurrentThread())delete ptr;else MessageManager::callAsync([ptr]{delete ptr;});});
