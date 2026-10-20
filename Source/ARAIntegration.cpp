@@ -63,12 +63,12 @@ protected:
  void didEndEditing(ARADocument*)override {editing=false;lock.exitWrite();}
  ARAAudioModification* doCreateAudioModification(ARAAudioSource* s,ARA::ARAAudioModificationHostRef ref,const ARAAudioModification* clone)override{return new NooriModification(s,ref,clone);}
  ARAPlaybackRenderer* doCreatePlaybackRenderer()override{return new NooriRenderer(getDocumentController(),lock);}
- void didUpdateAudioSourceContent(ARAAudioSource* s,ARAContentUpdateScopes)override {for(auto* m:s->getAudioModifications<NooriModification>()){m->needsLoad=true;m->session->cancel();}}
+ void doUpdateAudioSourceContent(ARAAudioSource* s,ARAContentUpdateScopes)override {for(auto* m:s->getAudioModifications<NooriModification>()){m->needsLoad=true;m->session->cancel();}}
  void didUpdatePlaybackRegionProperties(ARAPlaybackRegion* r)override {updateTimeline(r->getAudioModification<NooriModification>(),r);}
  bool doStoreObjectsToStream(ARAOutputStream& out,const ARAStoreObjectsFilter* filter)override {
   const auto& mods=filter->getAudioModificationsToStore<NooriModification>();if(!out.writeInt(1)||!out.writeInt((int)mods.size()))return false;
   for(auto* m:mods){auto state=m->session->archive(false);if(!out.writeString(m->getPersistentID())||!out.writeInt64((juce::int64)state.getSize())||!out.write(state.getData(),state.getSize()))return false;}
-  return !out.failed();
+  return true;
  }
  bool doRestoreObjectsFromStream(ARAInputStream& in,const ARARestoreObjectsFilter* filter)override {
   if(in.readInt()!=1)return false;int n=in.readInt();if(n<0||n>100000)return false;
@@ -80,7 +80,8 @@ private:
  void updateTimeline(NooriModification* m,ARAPlaybackRegion* r) {
   if(m->session->busy)return;
   double rate=m->getAudioSource()->getSampleRate();m->session->origin=(noori::Sample)std::llround((r->getStartInPlaybackTime()-r->getStartInAudioModificationTime())*rate);
-  if(auto* context=r->getMusicalContext()) {
+  auto* sequence=r->getRegionSequence();
+  if(auto* context=sequence?sequence->getMusicalContext():nullptr) {
    ARA::PlugIn::HostContentReader<ARA::kARAContentTypeTempoEntries> reader(context);
    if(reader&&reader.getEventCount()>=2) {
     std::vector<noori::TempoPoint> points;
@@ -97,7 +98,7 @@ private:
     if(!m->needsLoad||m->session->busy)continue;
     auto n=source->getSampleCount();auto nc=source->getChannelCount();double sr=source->getSampleRate();
     if(n<1||nc<1||nc>2||n*nc*4>128*1024*1024){m->session->status="ARA source exceeds mono/stereo 128 MiB limit";m->needsLoad=false;continue;}
-    auto reader=std::make_shared<ARAAudioSourceReader>(source);
+    auto reader=std::shared_ptr<ARAAudioSourceReader>(new ARAAudioSourceReader(source),[](ARAAudioSourceReader* ptr){if(MessageManager::existsAndIsCurrentThread())delete ptr;else MessageManager::callAsync([ptr]{delete ptr;});});
     if(!m->getPlaybackRegions().empty())updateTimeline(m,m->getPlaybackRegions().front());
     m->needsLoad=false;
     m->session->load([reader,n,nc,sr]{noori::Audio a{sr,std::vector<std::vector<float>>((std::size_t)nc,std::vector<float>((std::size_t)n))};AudioBuffer<float> block(nc,65536);for(juce::int64 at=0;at<n;){int size=(int)std::min<juce::int64>(65536,n-at);if(!reader->read(&block,0,size,at,true,true))throw std::runtime_error("ARA source access revoked or read failed");for(int c=0;c<nc;++c)std::memcpy(a.channels[(std::size_t)c].data()+at,block.getReadPointer(c),(std::size_t)size*sizeof(float));at+=size;}return a;},String(source->getName()),m->session->origin,m->session->timeline);

@@ -154,6 +154,7 @@ Attacks quantize(const Attacks& attacks,Sample length,Sample origin,const Timeli
   if(!s.sampleAccurate)shift=(Sample)std::llround(double(shift)/(timeline.sampleRate()*.001))*(Sample)std::llround(timeline.sampleRate()*.001);
   a.target=a.source+shift;
  }
+ if(selectedOnly){auto result=attacks;for(std::size_t i=0;i<out.size();++i)if(out[i].selected)result=moveAttack(result,i,out[i].target,length,s.maxStretch);return result;}
  return constrain(out,length,std::clamp(s.maxStretch,1.,2.));
 }
 Attacks moveAttack(const Attacks& a,std::size_t index,Sample target,Sample length,double limit) {

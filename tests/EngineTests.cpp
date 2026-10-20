@@ -25,6 +25,10 @@ int main(int argc,char** argv) {try {
   require(std::abs(q[0].target-(Sample)std::llround(.75*sr))<=1,"80 BPM eighth-note grid");
   s.strength=0;require(quantize(markers,a.length(),0,Timeline(sr),s)[0].target==onset,"Zero strength");s.strength=1;
   for(auto r:{Settings::Rhythm::straight,Settings::Rhythm::triplet,Settings::Rhythm::dotted}){s.rhythm=r;auto x=quantize(markers,a.length(),0,Timeline(sr),s);require(x[0].target>0,"Rhythm variants");}s.rhythm=Settings::Rhythm::straight;
+  Attacks selected{{(Sample)(sr*.5),(Sample)(sr*.5),1,1,false},{(Sample)(sr*.9),(Sample)(sr*.9),1,1,true},{(Sample)(sr*1.4),(Sample)(sr*1.4),1,1,false}};
+  auto selectedResult=quantize(selected,a.length(),0,Timeline(sr),s,true);
+  require(selectedResult[0].target==selected[0].target&&selectedResult[2].target==selected[2].target,"Selected-only preserves other markers");
+  s.humanizeMs=10;s.strength=0;require(quantize(markers,a.length(),0,Timeline(sr),s)[0].target==onset,"Zero strength also disables humanize");s.humanizeMs=0;s.strength=1;
   auto exact=render(a,markers,s);require(exact.channels==a.channels,"Identity must be bit-exact");
   auto corrected=render(a,q,s);require(corrected.length()==a.length(),"Duration preserved");
   auto freq=frequency(corrected.channels[0],(int)sr,(int)(sr*2.5),sr);

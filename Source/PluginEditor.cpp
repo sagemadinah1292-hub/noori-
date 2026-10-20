@@ -12,7 +12,7 @@ NooriEditor::NooriEditor(NooriProcessor& p):AudioProcessorEditor(p),processor(p)
  for(auto pair:{std::pair{&gridLabel,"GRID"},std::pair{&rhythmLabel,"RHYTHM"},std::pair{&modeLabel,"VOCAL MODE"}}){pair.first->setText(pair.second,juce::dontSendNotification);pair.first->setColour(juce::Label::textColourId,muted);addAndMakeVisible(pair.first);}
  setupSlider(sensitivity,sensitivityLabel,"Attack sensitivity",0,100,1," %");setupSlider(strength,strengthLabel,"Quantize strength",0,100,1," %");setupSlider(humanize,humanizeLabel,"Humanize",0,30,.1," ms");setupSlider(tolerance,toleranceLabel,"Timing tolerance",0,100,.1," ms");setupSlider(swing,swingLabel,"Swing",0,75,1," %");setupSlider(offset,offsetLabel,"Timing offset",-250,250,.1," ms");
  zoom.setRange(1,24,.1);zoom.setValue(1);zoom.setTextBoxStyle(juce::Slider::TextBoxLeft,false,60,22);zoom.setTextValueSuffix("x");zoom.onValueChange=[this]{viewFraction=1/zoom.getValue();viewStart=std::clamp(viewStart,0.,1-viewFraction);updateScroll();waveform.repaint();overview.repaint();};
- scroll.onScroll=[this]{viewStart=scroll.getCurrentRangeStart();waveform.repaint();overview.repaint();};
+ scroll.addListener(this);
  for(auto* c:{&grid,&rhythm,&mode})c->onChange=[this]{pullControls();};
  for(auto* c:{&sampleAccurate,&breath,&consonant,&vowel,&emotion})c->onClick=[this]{pullControls();};
  importButton.onClick=[this]{chooseFile(false);};exportButton.onClick=[this]{chooseFile(true);};captureButton.onClick=[this]{if(processor.captureArmed)processor.finishCapture();else processor.beginCapture();};analyseButton.onClick=[this]{session->analyse();};
@@ -22,7 +22,7 @@ NooriEditor::NooriEditor(NooriProcessor& p):AudioProcessorEditor(p),processor(p)
  alignButton.setColour(juce::TextButton::buttonColourId,purple);attackTab.setColour(juce::TextButton::buttonColourId,purple);
  settingsButton.onClick=[this]{juce::PopupMenu menu;menu.addSectionHeader("Maximum local stretch ratio");menu.addItem(1,"1.15x (gentle)",true,std::abs(session->settings.maxStretch-1.15)<.01);menu.addItem(2,"1.33x (default)",true,std::abs(session->settings.maxStretch-4./3)<.01);menu.addItem(3,"1.50x",true,std::abs(session->settings.maxStretch-1.5)<.01);menu.addSeparator();menu.addItem(4,"Reset all attack edits",session->original!=nullptr&&!session->busy);menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&settingsButton),[safe=juce::Component::SafePointer<NooriEditor>(this)](int result){if(!safe)return;if(result==4)safe->session->reset();else if(result>0){safe->session->settings.maxStretch=result==1?1.15:result==2?4./3:1.5;safe->session->status="Stretch limit applies to the next alignment.";}});};
  presets.onChange=[this]{auto& s=session->settings;if(presets.getSelectedId()==1){s=noori::Settings{};s.strength=.8;s.humanizeMs=4;}else if(presets.getSelectedId()==2){s=noori::Settings{};s.emotionalProtection=false;s.naturalNaat=false;s.toleranceMs=0;}else {s=noori::Settings{};s.naturalNaat=false;s.sensitivity=.7;s.strength=.7;}syncControls();};
- syncControls();setSize(1220,850);setResizable(true,false);setResizeLimits(1100,820,1800,1100);startTimerHz(20);
+ syncControls();setSize(1220,850);setResizable(true,false);setResizeLimits(1220,850,1800,1100);startTimerHz(20);
 }
 NooriEditor::~NooriEditor(){stopTimer();setLookAndFeel(nullptr);}
 void NooriEditor::setupSlider(juce::Slider& s,juce::Label& l,juce::String label,double min,double max,double step,juce::String suffix){addAndMakeVisible(s);addAndMakeVisible(l);l.setText(label,juce::dontSendNotification);l.setColour(juce::Label::textColourId,muted);s.setRange(min,max,step);s.setTextBoxStyle(juce::Slider::TextBoxRight,false,75,20);s.setTextValueSuffix(suffix);s.onValueChange=[this]{pullControls();};}
@@ -46,6 +46,7 @@ void NooriEditor::timerCallback(){
  repaint();waveform.repaint();overview.repaint();
 }
 void NooriEditor::chooseFile(bool save){chooser=std::make_unique<juce::FileChooser>(save?"Export corrected 24-bit WAV":"Import mono or stereo vocal",juce::File(),save?"*.wav":"*.wav;*.aif;*.aiff;*.flac");auto flags=save?juce::FileBrowserComponent::saveMode|juce::FileBrowserComponent::canSelectFiles|juce::FileBrowserComponent::warnAboutOverwriting:juce::FileBrowserComponent::openMode|juce::FileBrowserComponent::canSelectFiles;chooser->launchAsync(flags,[safe=juce::Component::SafePointer<NooriEditor>(this),save](const juce::FileChooser& fc){if(!safe)return;auto file=fc.getResult();if(file==juce::File())return;if(save)safe->processor.exportFile(file,safe->session);else safe->processor.importFile(file);});}
+void NooriEditor::scrollBarMoved(juce::ScrollBar*,double start){viewStart=start;waveform.repaint();overview.repaint();}
 void NooriEditor::updateScroll(){scroll.setRangeLimits(0,1);scroll.setCurrentRange(viewStart,viewFraction,juce::dontSendNotification);}
 void NooriEditor::paint(juce::Graphics& g){g.fillAll(bg);g.setColour(panel);g.fillRoundedRectangle(side.toFloat(),8);g.fillRoundedRectangle(editorArea.toFloat(),8);
  text(g,"NOORI TURAB",{22,15,230,27},24);text(g,"TEMPO",{222,15,100,27},24,purple);text(g,"Preserve the Emotion. Perfect the Timing.",{23,43,490,20},12,muted);

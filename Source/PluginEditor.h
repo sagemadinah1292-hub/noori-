@@ -1,7 +1,7 @@
 #pragma once
 #include "PluginProcessor.h"
 #include "ARAIntegration.h"
-class NooriEditor final : public juce::AudioProcessorEditor,private juce::Timer {
+class NooriEditor final : public juce::AudioProcessorEditor,private juce::Timer,private juce::ScrollBar::Listener {
 public:
  explicit NooriEditor(NooriProcessor&);~NooriEditor()override;
  void paint(juce::Graphics&)override;void resized()override;
@@ -30,6 +30,7 @@ private:
  std::unique_ptr<juce::FileChooser> chooser;juce::TooltipWindow tooltips{this,500};
  double viewStart=0,viewFraction=1;bool levelView=false;int selectedMarker=-1;
  juce::Rectangle<int> side,editorArea;
+ void scrollBarMoved(juce::ScrollBar*,double start)override;
  void timerCallback()override;void syncControls();void pullControls();void chooseFile(bool save);
  void setupSlider(juce::Slider&,juce::Label&,juce::String,double,double,double,juce::String suffix={});
  void bindSession(std::shared_ptr<EditSession>);void updateScroll();
