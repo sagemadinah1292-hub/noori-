@@ -53,7 +53,7 @@ void NooriEditor::timerCallback(){
  if(targetID.isEmpty()&&processor.isEditorView())if(auto s=selectedARASession(processor))bindSession(s);
 #endif
  bool batchBusy=false;for(const auto& s:batchSessions)batchBusy|=s->busy.load();
- if(!batchSessions.empty()&&!batchBusy){int failed=0;juce::String error;for(const auto& s:batchSessions)if(!s->status.contains("ready")){++failed;error=s->status;}batchStatus=juce::String((int)batchSessions.size()-failed)+" events completed; "+juce::String(failed)+" blocked"+(failed?" | "+error:"");batchSessions.clear();}
+ if(!batchSessions.empty()&&!batchBusy){int failed=0,edgeEvents=0;juce::String error;for(const auto& s:batchSessions){if(s->status.contains("clip-edge"))++edgeEvents;if(!s->status.contains("ready")){++failed;error=s->status;}}batchStatus=juce::String((int)batchSessions.size()-failed)+" events completed; "+juce::String(failed)+" blocked"+(failed?" | "+error:"")+(edgeEvents?" | clip-edge attacks kept in "+juce::String(edgeEvents)+" events; inspect each preview status":"");batchSessions.clear();}
  const bool busy=session->busy||batchBusy;bool has=session->original!=nullptr;
  referenceButton.setEnabled(has&&!busy);matchTarget.setEnabled(!busy);targetTrack.setEnabled(!busy);targetEvent.setEnabled(!busy&&targetEvent.getNumItems()>0);referenceTrack.setEnabled(!busy);referenceAnalysis.setEnabled(!busy&&session->useReference&&referenceID!="imported");
  matchTarget.setSelectedId(session->useReference?3:session->exactBpm?1:2,juce::dontSendNotification);audition.setToggleState(processor.audition.load(),juce::dontSendNotification);
@@ -178,7 +178,7 @@ void NooriEditor::performAlign(bool selectedOnly){
  s->settings=settings;s->exactBpm=strict;s->useReference=reference;
  if(reference&&referenceID!="imported"&&referenceID.isNotEmpty()){juce::String title,key;for(const auto& track:projectTracks)if(track.id==referenceID){title=track.name;key=track.persistentID;}s->loadProjectReference(snapshots,title,referenceAnalysis.getSelectedId()==1,true,selectedOnly,t.range,key);}
  else {if(reference&&s!=session){s->referenceClicks.clear();for(auto click:imported)s->referenceClicks.push_back((noori::Sample)std::llround((click+importedOrigin)*s->original->sampleRate/importedRate)-s->origin);s->referenceName=importedName;}s->align(selectedOnly,t.range);}
- batchSessions.push_back(s);
+ if(targets.size()>1)batchSessions.push_back(s);
  }
  processor.audition=true;audition.setToggleState(true,juce::dontSendNotification);if(targets.size()>1)batchStatus="Quantizing "+juce::String((int)targets.size())+" event sessions...";
 }

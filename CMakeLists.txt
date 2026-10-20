@@ -57,6 +57,8 @@ endif()
 
 if(NOORI_BUILD_PLUGIN AND BUILD_TESTING)
  add_executable(noori_plugin_smoke tests/PluginSmoke.cpp)
+ target_compile_options(noori_plugin_smoke PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/Zi>)
+ target_link_options(noori_plugin_smoke PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/DEBUG>)
  target_include_directories(noori_plugin_smoke PRIVATE Source "${juce_SOURCE_DIR}/modules" "${ara_sdk_SOURCE_DIR}")
  target_link_libraries(noori_plugin_smoke PRIVATE NooriTurabTempo)
  if(NOORI_ENABLE_ARA)

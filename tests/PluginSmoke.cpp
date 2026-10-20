@@ -3,6 +3,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <numbers>
+#include "CrashDiagnostics.h"
 static void check(bool value,const char* what){if(!value)throw std::runtime_error(what);}
 class HostTransport final:public juce::AudioPlayHead {
 public:
@@ -11,7 +12,7 @@ public:
 };
 static void waitSession(const std::shared_ptr<EditSession>& s,bool success=true){auto deadline=juce::Time::getMillisecondCounterHiRes()+30000;while(s->busy&&juce::Time::getMillisecondCounterHiRes()<deadline){s->settle();juce::Thread::sleep(2);}s->settle();check(!s->busy,"Worker timed out");if(success)check(s->status.contains("ready"),s->status.toRawUTF8());}
 #include "ProjectHostTests.h"
-int main(int argc,char** argv){try{
+int main(int argc,char** argv){installTestCrashDiagnostics();try{
  juce::ScopedJuceInitialiser_GUI gui;
 #if JucePlugin_Enable_ARA
  const auto* factory=createARAFactory();check(factory&&juce::String(factory->factoryID)=="audio.nooriturab.tempo.factory.0.2.0"&&juce::String(factory->documentArchiveID)=="audio.nooriturab.tempo.archive.3","ARA factory identifiers");
