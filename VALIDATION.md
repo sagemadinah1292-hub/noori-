@@ -1,4 +1,4 @@
-# Validation status — development build 0.1.1
+# Validation status — development build 0.2.0
 
 This is not production acceptance. No claim of a delivered Windows binary, Cubase compatibility, or verified ARA integration is made by a source checkout.
 
@@ -33,3 +33,8 @@ Release acceptance remains blocked until the unchecked host/audio tests pass. Re
 Automated additions cover default 100% BPM targets with low confidence, non-zero project/PPQ origins at 44.1/48 kHz, exact off-grid reference matching, stereo click onset samples, rejection of impossible exact matches, actual undo/redo buffer restoration, manual edit history/redo branching, reference-file import anchoring and saved reference persistence. These checks do not establish Cubase acceptance.
 
 Retest in Cubase: import vocal and rendered click with their correct cursor origins; inspect original/corrected/reference lanes together; match selected attacks to off-grid click transients; verify an impossible exact match keeps the previous result; listen through repeated Undo/Redo and original listening; save/reopen. Test host metadata changes without losing edit history. Grid alignment reports safety-limited attacks instead of claiming they reached the grid.
+
+## 0.2.0 additional gates
+The in-process official ARA SDK test host creates real named project tracks, sources, modifications and trimmed playback regions. The real editor dropdowns must enumerate an unselected metronome track, quantize the chosen target track without marker selection, match rendered transients at mapped sample coordinates and preserve attacks outside the event trim. Separate tests cover reference sample-rate conversion, duplicate-region merging, reanchoring, Select All/range selection and activation of Align selected attacks. Exact BPM tests require on-grid integer targets or explicit rejection, including tempo changes.
+
+Retest natively: assign the extension to both vocal and rendered click events, verify both named tracks appear, choose the reference dropdown and quantize the edit track. Repeat for an ordinary insert and confirm it explains unavailable project access. Check real recorded Urdu attack locations against manually annotated consonant onsets; mathematical target accuracy does not validate automatic vocal onset detection. See docs/FEATURE-CHECK.md.

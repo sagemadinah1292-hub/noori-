@@ -4,6 +4,7 @@
 #if JucePlugin_Enable_ARA
 #include <ARA_Library/PlugIn/ARAPlug.cpp>
 #include <ARA_Library/Dispatch/ARAPlugInDispatch.cpp>
+#include <ARA_Library/Dispatch/ARAHostDispatch.cpp>
 #include <ARA_Library/Utilities/ARAPitchInterpretation.cpp>
 #include <ARA_Library/Utilities/ARAChannelArrangement.cpp>
 #endif

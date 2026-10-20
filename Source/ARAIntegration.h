@@ -9,4 +9,6 @@ public:
  bool needsLoad=true,needsTimeline=true;
 };
 std::shared_ptr<EditSession> selectedARASession(NooriProcessor&);
+std::vector<ProjectTrack> availableProjectTracks(NooriProcessor&);
+bool configureProjectRegion(NooriProcessor&,const juce::String& id);
 #endif

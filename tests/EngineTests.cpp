@@ -41,6 +41,12 @@ int main(int argc,char** argv) {try {
   require(groupResult[0].target==groupClicks[0]&&groupResult[1].target==groupClicks[1]&&groupResult[2].target==group[2].target,"Simultaneous exact selected group preserves unselected anchors");
   auto impossible=false;try{quantize(markers,a.length(),0,Timeline(sr),defaults,false,{1});}catch(...){impossible=true;}
   require(impossible,"Impossible exact reference match rejected without partial success");
+  auto strict=quantize(markers,a.length(),0,Timeline(sr),defaults,false,{},true);
+  require(strict[0].target==(Sample)std::llround(sr*.75),"Exact BPM never projects between grid lines");
+  bool strictRejected=false;try{Attacks tooFar{{(Sample)std::llround(sr*.2),(Sample)std::llround(sr*.2),1,1,true}};quantize(tooFar,a.length(),0,Timeline(sr),defaults,false,{},true);}catch(...){strictRejected=true;}
+  require(strictRejected,"Unsafe exact BPM request rejected instead of partial off-grid warp");
+  Attacks afterTempo{{(Sample)std::llround(sr*3.52),(Sample)std::llround(sr*3.52),1,1,true}};
+  require(quantize(afterTempo,a.length(),0,t,defaults,false,{},true)[0].target==(Sample)std::llround(sr*3.5),"Exact targets after tempo change");
   s.strength=0;require(quantize(markers,a.length(),0,Timeline(sr),s)[0].target==onset,"Zero strength");s.strength=1;
   for(auto r:{Settings::Rhythm::straight,Settings::Rhythm::triplet,Settings::Rhythm::dotted}){s.rhythm=r;auto x=quantize(markers,a.length(),0,Timeline(sr),s);require(x[0].target>0,"Rhythm variants");}s.rhythm=Settings::Rhythm::straight;
   Attacks selected{{(Sample)(sr*.5),(Sample)(sr*.5),1,1,false},{(Sample)(sr*.9),(Sample)(sr*.9),1,1,true},{(Sample)(sr*1.4),(Sample)(sr*1.4),1,1,false}};

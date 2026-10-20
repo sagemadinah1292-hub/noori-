@@ -9,10 +9,39 @@ NooriModification::NooriModification(ARAAudioSource* source,ARA::ARAAudioModific
  session->onChanged=[this]{notifyContentChanged(ARAContentUpdateScopes::samplesAreAffected(),true);for(auto* r:getPlaybackRegions())r->notifyContentChanged(ARAContentUpdateScopes::samplesAreAffected(),true);};
 }
 NooriModification::~NooriModification(){session->onChanged={};session->cancel();}
+static void applyRegionTimeline(NooriModification* m,ARAPlaybackRegion* r) {
+  if(m->session->busy)return;
+  double rate=m->getAudioSource()->getSampleRate();auto oldOrigin=m->session->origin;m->session->origin=(noori::Sample)std::llround((r->getStartInPlaybackTime()-r->getStartInAudioModificationTime())*rate);for(auto& click:m->session->referenceClicks)click+=oldOrigin-m->session->origin;
+  auto* sequence=r->getRegionSequence();
+  if(auto* context=sequence?sequence->getMusicalContext():nullptr) {
+   ARA::PlugIn::HostContentReader<ARA::kARAContentTypeTempoEntries> reader(context);
+   if(reader&&reader.getEventCount()>=2) {
+    std::vector<noori::TempoPoint> points;
+    for(int i=0;i+1<reader.getEventCount();++i){auto a=reader.getDataForEvent(i),b=reader.getDataForEvent(i+1);double bpm=(b.quarterPosition-a.quarterPosition)*60/(b.timePosition-a.timePosition);auto sample=(noori::Sample)std::llround(a.timePosition*rate);double quarter=a.quarterPosition;if(!points.empty()){const auto& prev=points.back();quarter=prev.quarter+(sample-prev.sample)*prev.bpm/(60*rate);}points.push_back({sample,bpm,quarter});}
+    try {m->session->timeline=noori::Timeline(rate,points);}catch(...){m->session->status="Unsupported host tempo content";}
+   }
+  }
+ }
 std::shared_ptr<EditSession> selectedARASession(NooriProcessor& p) {
  if(auto* view=p.getEditorView()) {auto regions=view->getViewSelection().getEffectivePlaybackRegions<ARAPlaybackRegion>();if(!regions.empty())return regions.front()->getAudioModification<NooriModification>()->session;}
  return {};
 }
+static String regionID(ARAPlaybackRegion* region){return String::toHexString((juce::int64)(std::intptr_t)region);}
+std::vector<ProjectTrack> availableProjectTracks(NooriProcessor& p){
+ std::vector<ProjectTrack> tracks;auto* view=p.getEditorView();if(!view)return tracks;
+ auto* document=view->getDocumentController()->getDocument<ARADocument>();
+ for(auto* sequence:document->getRegionSequences<ARARegionSequence>()){
+  ProjectTrack track;track.id=String::toHexString((juce::int64)(std::intptr_t)sequence);track.name=String::fromUTF8(sequence->getName());if(track.name.isEmpty())track.name="Unnamed project track";
+  for(auto* r:sequence->getPlaybackRegions<ARAPlaybackRegion>()){
+   auto* m=r->getAudioModification<NooriModification>();auto title=String::fromUTF8(r->getName());if(title.isEmpty())title=String::fromUTF8(m->getAudioSource()->getName());
+   if(std::abs(r->getDurationInPlaybackTime()-r->getDurationInAudioModificationTime())>1./m->getAudioSource()->getSampleRate())continue;
+   track.regions.push_back({regionID(r),title,m->session,r->getStartInAudioModificationTime(),r->getDurationInAudioModificationTime(),r->getStartInPlaybackTime()});
+  }
+  if(!track.regions.empty()){std::vector<std::string> ids;for(auto* r:sequence->getPlaybackRegions<ARAPlaybackRegion>())ids.push_back(r->getAudioModification<NooriModification>()->getPersistentID());std::sort(ids.begin(),ids.end());track.persistentID=track.name+"|";for(const auto& id:ids)track.persistentID+=String::fromUTF8(id.c_str())+"|";tracks.push_back(std::move(track));}
+ }
+ return tracks;
+}
+bool configureProjectRegion(NooriProcessor& p,const String& id){auto* view=p.getEditorView();if(!view)return false;for(auto* sequence:view->getDocumentController()->getDocument<ARADocument>()->getRegionSequences<ARARegionSequence>())for(auto* r:sequence->getPlaybackRegions<ARAPlaybackRegion>())if(regionID(r)==id){applyRegionTimeline(r->getAudioModification<NooriModification>(),r);return true;}return false;}
 class NooriController;
 class NooriRenderer final : public ARAPlaybackRenderer {
 public:
@@ -86,31 +115,19 @@ protected:
  }
 private:
  ReadWriteLock lock;bool editing=false;
- void updateTimeline(NooriModification* m,ARAPlaybackRegion* r) {
-  if(m->session->busy)return;
-  double rate=m->getAudioSource()->getSampleRate();auto oldOrigin=m->session->origin;m->session->origin=(noori::Sample)std::llround((r->getStartInPlaybackTime()-r->getStartInAudioModificationTime())*rate);for(auto& click:m->session->referenceClicks)click+=oldOrigin-m->session->origin;
-  auto* sequence=r->getRegionSequence();
-  if(auto* context=sequence?sequence->getMusicalContext():nullptr) {
-   ARA::PlugIn::HostContentReader<ARA::kARAContentTypeTempoEntries> reader(context);
-   if(reader&&reader.getEventCount()>=2) {
-    std::vector<noori::TempoPoint> points;
-    for(int i=0;i+1<reader.getEventCount();++i){auto a=reader.getDataForEvent(i),b=reader.getDataForEvent(i+1);double bpm=(b.quarterPosition-a.quarterPosition)*60/(b.timePosition-a.timePosition);auto sample=(noori::Sample)std::llround(a.timePosition*rate);double quarter=a.quarterPosition;if(!points.empty()){const auto& prev=points.back();quarter=prev.quarter+(sample-prev.sample)*prev.bpm/(60*rate);}points.push_back({sample,bpm,quarter});}
-    try {m->session->timeline=noori::Timeline(rate,points);}catch(...){m->session->status="Unsupported host tempo content";}
-   }
-  }
- }
+
  void timerCallback()override {
   if(editing)return;
   for(auto* source:getDocument()->getAudioSources<ARAAudioSource>()) {
    if(!source->isSampleAccessEnabled())continue;
    for(auto* m:source->getAudioModifications<NooriModification>()) {
     if(m->session->busy)continue;
-    if(m->needsTimeline&&!m->getPlaybackRegions().empty()){updateTimeline(m,m->getPlaybackRegions().front());m->needsTimeline=false;}
+    if(m->needsTimeline&&!m->getPlaybackRegions().empty()){applyRegionTimeline(m,m->getPlaybackRegions().front());m->needsTimeline=false;}
     if(!m->needsLoad)continue;
     auto n=source->getSampleCount();auto nc=source->getChannelCount();double sr=source->getSampleRate();
     if(n<1||nc<1||nc>2||n*nc*4>128*1024*1024){m->session->status="ARA source exceeds mono/stereo 128 MiB limit";m->needsLoad=false;continue;}
     auto reader=std::shared_ptr<ARAAudioSourceReader>(new ARAAudioSourceReader(source),[](ARAAudioSourceReader* ptr){if(MessageManager::existsAndIsCurrentThread())delete ptr;else MessageManager::callAsync([ptr]{delete ptr;});});
-    if(!m->getPlaybackRegions().empty())updateTimeline(m,m->getPlaybackRegions().front());
+    if(!m->getPlaybackRegions().empty())applyRegionTimeline(m,m->getPlaybackRegions().front());
     m->needsLoad=false;
     m->session->load([reader,n,nc,sr]{noori::Audio a{sr,std::vector<std::vector<float>>((std::size_t)nc,std::vector<float>((std::size_t)n))};AudioBuffer<float> block(nc,65536);for(juce::int64 at=0;at<n;){int size=(int)std::min<juce::int64>(65536,n-at);if(!reader->read(&block,0,size,at,true,true))throw std::runtime_error("ARA source access revoked or read failed");for(int c=0;c<nc;++c)std::memcpy(a.channels[(std::size_t)c].data()+at,block.getReadPointer(c),(std::size_t)size*sizeof(float));at+=size;}return a;},String::fromUTF8(source->getName()),m->session->origin,m->session->timeline);
    }

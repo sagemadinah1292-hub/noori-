@@ -4,6 +4,18 @@
 #include <atomic>
 #include <mutex>
 #include <memory>
+#include <optional>
+using AttackRange=std::optional<std::pair<noori::Sample,noori::Sample>>;
+struct ProjectReferenceRegion {
+ std::shared_ptr<const noori::Audio> audio;
+ double sourceStart=0,sourceDuration=0,playbackStart=0;
+};
+struct ProjectTrackRegion {
+ juce::String id,name;
+ std::shared_ptr<class EditSession> session;
+ double sourceStart=0,sourceDuration=0,playbackStart=0;
+};
+struct ProjectTrack {juce::String id,name,persistentID;std::vector<ProjectTrackRegion> regions;bool editable=true;};
 struct Revision { noori::Attacks attacks; std::shared_ptr<const noori::Audio> audio; };
 class EditSession final : private juce::Timer, public std::enable_shared_from_this<EditSession> {
 public:
@@ -15,8 +27,12 @@ public:
  std::shared_ptr<const noori::Audio> original;
  noori::Attacks attacks;
  std::vector<noori::Sample> referenceClicks;
- juce::String referenceName;
- bool useReference=false;
+ juce::String referenceName,referenceProjectID;bool referenceIsClick=true;
+ bool useReference=false,exactBpm=true;
+ void loadProjectReference(std::vector<ProjectReferenceRegion>,juce::String,bool clickTrack=true,bool alignWhenReady=false,bool selectedOnly=false,AttackRange range={},juce::String projectID={});
+ std::shared_ptr<const noori::Audio> snapshot()const;
+ void selectAll(bool selected=true);void selectRange(noori::Sample,noori::Sample,bool additive=false);
+ void anchorTo(noori::Sample);
  void loadReference(const juce::File&,noori::Sample projectStart);
  std::atomic<const noori::Audio*> audible{nullptr},originalAudible{nullptr};
  std::atomic<noori::Sample> realtimeOrigin{0};
@@ -24,7 +40,7 @@ public:
  std::atomic<float> progress{0};
  std::function<void()> onChanged;
  void load(std::function<noori::Audio()> reader, juce::String nameIn, noori::Sample start, noori::Timeline map);
- void analyse(); void align(bool selectedOnly=false); void move(std::size_t,noori::Sample); void reset();
+ void analyse(); void align(bool selectedOnly=false,AttackRange range={}); void move(std::size_t,noori::Sample); void reset();
  void undo(); void redo(); bool canUndo()const; bool canRedo()const;
  void cancel(); void settle();
  const noori::Audio* displayed()const {return compare.load()?original.get():audible.load();}
@@ -33,7 +49,7 @@ public:
  void setSelected(std::size_t index,bool additive);
 private:
  juce::ThreadPool pool{1};
- struct Result {std::shared_ptr<const noori::Audio> source;Revision revision;juce::String error,message; bool newSource=false,referenceOnly=false; std::vector<noori::Sample> clicks;juce::String referenceTitle;};
+ struct Result {std::shared_ptr<const noori::Audio> source;Revision revision;juce::String error,message; bool newSource=false,referenceOnly=false,alignWhenReady=false,selectedOnly=false; std::vector<noori::Sample> clicks;juce::String referenceTitle,projectID;bool clickTrack=true;AttackRange range;};
  std::mutex pendingMutex;
  std::unique_ptr<Result> pending;
  std::atomic<bool> cancelled{false};
@@ -64,12 +80,18 @@ public:
  void getStateInformation(juce::MemoryBlock&)override;void setStateInformation(const void*,int)override;
  std::shared_ptr<EditSession> insertSession;
  std::atomic<double> bpm{80},quarter{0};std::atomic<std::int64_t> hostSample{0};
+ std::atomic<unsigned> transportSequence{0};
+ struct Transport {double bpm,quarter;noori::Sample sample;bool valid;};
+ Transport transport()const;
  std::atomic<int> numerator{4},denominator{4};std::atomic<bool> playing{false},hostTempoValid{false};
  std::atomic<bool> audition{false},captureArmed{false};
  void beginCapture();void finishCapture();
  void importFile(const juce::File&);void exportFile(const juce::File&,std::shared_ptr<EditSession>);
  juce::String captureStatus()const;
+ void updateTrackProperties(const TrackProperties&)override;
+ std::vector<ProjectTrack> connectedReferenceTracks()const;
 private:
+ std::uint64_t registryID=0;
  noori::Audio capture;
  std::atomic<noori::Sample> captureCount{0};
  noori::Sample captureOrigin=0,expectedSample=0;

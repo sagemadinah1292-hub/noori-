@@ -143,7 +143,7 @@ static Attacks constrain(Attacks a,Sample length,double limit) {
  }
  validateMarkers(a,length,limit);return a;
 }
-Attacks quantize(const Attacks& attacks,Sample length,Sample origin,const Timeline& timeline,const Settings& s,bool selectedOnly,const std::vector<Sample>& reference) {
+Attacks quantize(const Attacks& attacks,Sample length,Sample origin,const Timeline& timeline,const Settings& s,bool selectedOnly,const std::vector<Sample>& reference,bool exactBpm) {
  if(s.division!=4&&s.division!=8&&s.division!=16&&s.division!=32)throw std::invalid_argument("Unsupported grid");
  if(!std::isfinite(s.strength)||!std::isfinite(s.swing)||!std::isfinite(s.offsetMs)||!std::isfinite(s.humanizeMs)||!std::isfinite(s.toleranceMs))throw std::invalid_argument("Invalid quantization settings");
  double step=4./s.division;
@@ -165,6 +165,7 @@ Attacks quantize(const Attacks& attacks,Sample length,Sample origin,const Timeli
    if(it!=reference.begin()&&std::abs(double(*(it-1)-a.source))<=std::abs(double(target-a.source)))target=*(it-1);
    target+=origin;distance=std::abs(double(target-project));
   }
+  if(exactBpm&&(target-origin<=0||target-origin>=length)){a.target=a.source;continue;} // Fixed clip endpoints cannot be warped onto themselves.
   if(distance<s.toleranceMs*.001*timeline.sampleRate()){a.target=a.source;continue;}
   double strength=std::clamp(s.strength,0.,1.);
   if(s.emotionalProtection&&strength<1.) strength*=.65+.35*std::clamp(double(a.confidence),0.,1.);
@@ -172,12 +173,12 @@ Attacks quantize(const Attacks& attacks,Sample length,Sample origin,const Timeli
   if(!s.sampleAccurate)shift=(Sample)std::llround(double(shift)/(timeline.sampleRate()*.001))*(Sample)std::llround(timeline.sampleRate()*.001);
   a.target=a.source+shift;
  }
- if(!reference.empty()) {
+ if(!reference.empty()||exactBpm) {
   // An exact reference request is a simultaneous set of anchors. Validate it
   // directly; projecting one marker at a time can hide a collision or reject a
   // valid selected group because its neighbours have not moved yet.
   try {validateMarkers(out,length,s.maxStretch);}
-  catch(const std::exception&) {throw std::runtime_error("Exact click match exceeds stretch limits or maps multiple attacks to one click. Select fewer attacks, use a finer click track, or increase the stretch limit.");}
+  catch(const std::exception&) {throw std::runtime_error(exactBpm?"Exact BPM alignment blocked: attacks collide on one beat or exceed the stretch limit. Choose a finer grid, select fewer attacks, or increase the stretch limit. Previous audio kept.":"Exact click match exceeds stretch limits or maps multiple attacks to one click. Select fewer attacks, use a finer click track, or increase the stretch limit.");}
   return out;
  }
  if(selectedOnly){auto result=attacks;for(std::size_t i=0;i<out.size();++i)if(out[i].selected)result=moveAttack(result,i,out[i].target,length,s.maxStretch);return result;}

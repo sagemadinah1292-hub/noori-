@@ -18,7 +18,7 @@ private:
   void mouseDown(const juce::MouseEvent&)override;void mouseDrag(const juce::MouseEvent&)override;void mouseUp(const juce::MouseEvent&)override;
   void mouseWheelMove(const juce::MouseEvent&,const juce::MouseWheelDetails&)override;
  private:
-  NooriEditor& editor;bool overview;int dragging=-1;noori::Sample dragTarget=0;
+  NooriEditor& editor;bool overview;int dragging=-1;noori::Sample dragTarget=0;bool rangeSelecting=false,additiveRange=false;float rangeStart=0,rangeEnd=0;
   noori::Sample sampleAt(float)const;float xAt(noori::Sample)const;
  };
  NooriProcessor& processor;std::shared_ptr<EditSession> session;
@@ -26,9 +26,17 @@ private:
  WaveView waveform,overview;
  juce::TextButton importButton{"Import vocal"},captureButton{"Capture"},analyseButton{"Detect attacks"},exportButton{"Export WAV"};
  juce::TextButton undoButton{"Undo"},redoButton{"Redo"},compareButton{"Listen original"},settingsButton{"Settings"};
- juce::TextButton attackTab{"Attack"},pitchTab{"Pitch"},levelTab{"Level"},selectedButton{"Align selected attacks"},alignButton{"ALIGN ALL ATTACKS TO GRID"};
+ juce::TextButton attackTab{"Attack"},pitchTab{"Pitch"},levelTab{"Level"},selectedButton{"Align selected attacks"},alignButton{"Quantize selected track"};
  juce::ToggleButton sampleAccurate{"Sample accurate"},breath{"Breath protection"},consonant{"Consonant protection"},vowel{"Long vowel protection"},emotion{"Emotional phrase protection"},audition{"Audition with Cubase transport"};
- juce::TextButton referenceButton{"Import metronome click"};
+ juce::TextButton referenceButton{"Import reference"},selectAllButton{"Select all attacks"},clearSelectionButton{"Clear selection"},anchorButton{"Audio start = cursor"};
+ juce::ComboBox targetTrack,targetEvent,referenceTrack,referenceAnalysis;
+ juce::Slider manualBpm;
+ std::vector<ProjectTrack> projectTracks;
+ std::vector<std::shared_ptr<EditSession>> batchSessions;
+ juce::String targetID,referenceID,inventory,batchStatus;
+ void refreshProjectTracks();void chooseTarget();void chooseReference();void performAlign(bool selectedOnly);
+ std::vector<ProjectReferenceRegion> referenceSnapshot()const;
+
  juce::ComboBox matchTarget;
  juce::ComboBox grid,rhythm,mode,presets;
  juce::Slider sensitivity,strength,humanize,tolerance,swing,offset,zoom;
