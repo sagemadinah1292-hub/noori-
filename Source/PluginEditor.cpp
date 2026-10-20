@@ -38,6 +38,12 @@ void NooriEditor::timerCallback(){
  if(processor.isEditorView()){if(auto s=selectedARASession(processor))bindSession(s);}
 #endif
  const bool busy=session->busy;bool has=session->original!=nullptr;
+ if(has&&!busy&&session->timeline.points().size()==1&&processor.hostTempoValid&&processor.getSampleRate()>0){
+  const double rate=session->original->sampleRate,bpm=processor.bpm.load(),q=processor.quarter.load();
+  const auto at=(noori::Sample)std::llround(processor.hostSample.load()*rate/processor.getSampleRate());
+  if(std::isfinite(bpm)&&bpm>=1&&bpm<=1000&&std::isfinite(q)&&(std::abs(session->timeline.sampleRate()-rate)>.1||std::abs(session->timeline.points().front().bpm-bpm)>1e-6||std::abs(session->timeline.quarterAt(at)-q)>1e-4))session->timeline=noori::Timeline(rate,{{at,bpm,q}});
+ }
+
  for(auto* b:{&analyseButton,&alignButton,&selectedButton,&exportButton,&compareButton})b->setEnabled(has&&!busy);
  selectedButton.setEnabled(has&&!busy&&std::any_of(session->attacks.begin(),session->attacks.end(),[](const auto& a){return a.selected;}));
  undoButton.setEnabled(session->canUndo());redoButton.setEnabled(session->canRedo());
