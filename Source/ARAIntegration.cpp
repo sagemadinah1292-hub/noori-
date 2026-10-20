@@ -76,7 +76,7 @@ protected:
  void doUpdateMusicalContextContent(ARAMusicalContext*,ARAContentUpdateScopes)override {for(auto* s:getDocument()->getAudioSources<ARAAudioSource>())for(auto* m:s->getAudioModifications<NooriModification>())m->needsTimeline=true;}
  bool doStoreObjectsToStream(ARAOutputStream& out,const ARAStoreObjectsFilter* filter)override {
   const auto& mods=filter->getAudioModificationsToStore<NooriModification>();if(!out.writeInt(1)||!out.writeInt((int)mods.size()))return false;
-  for(auto* m:mods){auto state=m->session->archive(false);if(!out.writeString(String::fromUTF8(m->getPersistentID()))||!out.writeInt64((juce::int64)state.getSize())||!out.write(state.getData(),state.getSize()))return false;}
+  for(auto* m:mods){auto state=m->session->archive(false);if(!out.writeString(String::fromUTF8(m->getPersistentID().c_str()))||!out.writeInt64((juce::int64)state.getSize())||!out.write(state.getData(),state.getSize()))return false;}
   return true;
  }
  bool doRestoreObjectsFromStream(ARAInputStream& in,const ARARestoreObjectsFilter* filter)override {
