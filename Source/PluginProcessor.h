@@ -14,6 +14,10 @@ public:
  noori::Timeline timeline;
  std::shared_ptr<const noori::Audio> original;
  noori::Attacks attacks;
+ std::vector<noori::Sample> referenceClicks;
+ juce::String referenceName;
+ bool useReference=false;
+ void loadReference(const juce::File&,noori::Sample projectStart);
  std::atomic<const noori::Audio*> audible{nullptr},originalAudible{nullptr};
  std::atomic<noori::Sample> realtimeOrigin{0};
  std::atomic<bool> compare{false}, busy{false};
@@ -29,7 +33,7 @@ public:
  void setSelected(std::size_t index,bool additive);
 private:
  juce::ThreadPool pool{1};
- struct Result {std::shared_ptr<const noori::Audio> source;Revision revision;juce::String error; bool newSource=false;};
+ struct Result {std::shared_ptr<const noori::Audio> source;Revision revision;juce::String error,message; bool newSource=false,referenceOnly=false; std::vector<noori::Sample> clicks;juce::String referenceTitle;};
  std::mutex pendingMutex;
  std::unique_ptr<Result> pending;
  std::atomic<bool> cancelled{false};

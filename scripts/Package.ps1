@@ -14,7 +14,7 @@ Copy-Item "$PSScriptRoot/Install.bat", "$PSScriptRoot/Verify-PE.ps1", 'README.md
 Copy-Item -Recurse 'licenses' $package
 Copy-Item (Join-Path $BuildDir 'Preview.png') $package
 $buildInfo=@{
- product='NOORI TURAB TEMPO';version='0.1.0';platform='Windows x64';format='VST3';
+ product='NOORI TURAB TEMPO';version='0.1.1';platform='Windows x64';format='VST3';
  commit=(& git rev-parse HEAD);built_utc=[DateTime]::UtcNow.ToString('o');
  pe_amd64_verified=$true;automated_dsp_tests='passed';processor_smoke='passed';
  cubase_pro_15_tested=$false;ara_extension_compiled=$true;ara_host_validation='not run';

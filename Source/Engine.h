@@ -26,16 +26,17 @@ private:
 struct Settings {
  int division = 8;
  enum class Rhythm { straight, triplet, dotted } rhythm = Rhythm::straight;
- double strength = 1, swing = 0, offsetMs = 0, humanizeMs = 0, toleranceMs = 8;
+ double strength = 1, swing = 0, offsetMs = 0, humanizeMs = 0, toleranceMs = 0;
  double sensitivity = .55, maxStretch = 1.3333333333;
  bool breathProtection = true, consonantProtection = true, vowelProtection = true;
- bool emotionalProtection = true, naturalNaat = true, sampleAccurate = true;
+ bool emotionalProtection = false, naturalNaat = true, sampleAccurate = true;
 };
 struct Attack { Sample source = 0, target = 0; float confidence = 0, voicing = 0; bool selected = false; };
 using Attacks = std::vector<Attack>;
 using Progress = std::function<bool(float)>; // false cancels
+std::vector<Sample> detectClicks(const Audio&);
 Attacks detect(const Audio&, const Settings&, Progress = {});
-Attacks quantize(const Attacks&, Sample length, Sample projectStart, const Timeline&, const Settings&, bool selectedOnly = false);
+Attacks quantize(const Attacks&, Sample length, Sample projectStart, const Timeline&, const Settings&, bool selectedOnly = false, const std::vector<Sample>& reference = {});
 Attacks moveAttack(const Attacks&, std::size_t index, Sample target, Sample length, double maxStretch);
 Audio render(const Audio&, const Attacks&, const Settings&, Progress = {});
 std::string serializeAttacks(const Attacks&);

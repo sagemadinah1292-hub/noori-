@@ -118,6 +118,18 @@ static void validateMarkers(const Attacks& a,Sample length,double maxStretch) {
   lastS=s;lastT=t;
  }
 }
+std::vector<Sample> detectClicks(const Audio& audio) {
+ audio.validate();float peak=0;
+ for(const auto& c:audio.channels)for(float x:c)peak=std::max(peak,std::abs(x));
+ std::vector<Sample> clicks;if(peak<1e-6f)return clicks;
+ // Threshold crossing, not the peak of the ringing click: retain its onset sample.
+ const float threshold=peak*.04f;const Sample quietNeeded=std::max<Sample>(1,(Sample)(audio.sampleRate*.025));
+ Sample quiet=quietNeeded;
+ for(Sample i=0;i<audio.length();++i){float level=0;for(const auto& c:audio.channels)level=std::max(level,std::abs(c[(std::size_t)i]));
+  if(level>=threshold){if(quiet>=quietNeeded)clicks.push_back(i);quiet=0;}else ++quiet;
+ }
+ return clicks;
+}
 static Attacks constrain(Attacks a,Sample length,double limit) {
  // Sequential feasible projection; final endpoint is fixed and included in each constraint.
  Sample prevS=0,prevT=0;
@@ -131,7 +143,7 @@ static Attacks constrain(Attacks a,Sample length,double limit) {
  }
  validateMarkers(a,length,limit);return a;
 }
-Attacks quantize(const Attacks& attacks,Sample length,Sample origin,const Timeline& timeline,const Settings& s,bool selectedOnly) {
+Attacks quantize(const Attacks& attacks,Sample length,Sample origin,const Timeline& timeline,const Settings& s,bool selectedOnly,const std::vector<Sample>& reference) {
  if(s.division!=4&&s.division!=8&&s.division!=16&&s.division!=32)throw std::invalid_argument("Unsupported grid");
  if(!std::isfinite(s.strength)||!std::isfinite(s.swing)||!std::isfinite(s.offsetMs)||!std::isfinite(s.humanizeMs)||!std::isfinite(s.toleranceMs))throw std::invalid_argument("Invalid quantization settings");
  double step=4./s.division;
@@ -147,15 +159,23 @@ Attacks quantize(const Attacks& attacks,Sample length,Sample origin,const Timeli
    auto candidate=timeline.sampleAt(beat)+(Sample)std::llround(s.offsetMs*.001*timeline.sampleRate());
    if(std::abs(double(candidate-project))<distance){target=candidate;distance=std::abs(double(candidate-project));}
   }
+  if(!reference.empty()) {
+   auto it=std::lower_bound(reference.begin(),reference.end(),a.source);
+   target=it==reference.end()?reference.back():*it;
+   if(it!=reference.begin()&&std::abs(double(*(it-1)-a.source))<=std::abs(double(target-a.source)))target=*(it-1);
+   target+=origin;distance=std::abs(double(target-project));
+  }
   if(distance<s.toleranceMs*.001*timeline.sampleRate()){a.target=a.source;continue;}
   double strength=std::clamp(s.strength,0.,1.);
-  if(s.emotionalProtection) strength*=.65+.35*std::clamp(double(a.confidence),0.,1.);
+  if(s.emotionalProtection&&strength<1.) strength*=.65+.35*std::clamp(double(a.confidence),0.,1.);
   auto shift=(Sample)std::llround((target-project)*strength+human(random)*s.humanizeMs*.001*timeline.sampleRate()*strength);
   if(!s.sampleAccurate)shift=(Sample)std::llround(double(shift)/(timeline.sampleRate()*.001))*(Sample)std::llround(timeline.sampleRate()*.001);
   a.target=a.source+shift;
  }
- if(selectedOnly){auto result=attacks;for(std::size_t i=0;i<out.size();++i)if(out[i].selected)result=moveAttack(result,i,out[i].target,length,s.maxStretch);return result;}
- return constrain(out,length,std::clamp(s.maxStretch,1.,2.));
+ if(selectedOnly){auto result=attacks;for(std::size_t i=0;i<out.size();++i)if(out[i].selected)result=moveAttack(result,i,out[i].target,length,s.maxStretch);if(!reference.empty())for(std::size_t i=0;i<out.size();++i)if(out[i].selected&&out[i].target!=result[i].target)throw std::runtime_error("Exact click match exceeds stretch limits. Select fewer attacks or increase the stretch limit.");return result;}
+ auto constrained=constrain(out,length,std::clamp(s.maxStretch,1.,2.));
+ if(!reference.empty())for(std::size_t i=0;i<out.size();++i)if(out[i].target!=constrained[i].target)throw std::runtime_error("Exact click match exceeds stretch limits or maps multiple attacks to one click. Select fewer attacks, use a finer click track, or increase the stretch limit.");
+ return constrained;
 }
 Attacks moveAttack(const Attacks& a,std::size_t index,Sample target,Sample length,double limit) {
  validateMarkers(a,length,limit);if(index>=a.size())throw std::out_of_range("Marker index");auto out=a;

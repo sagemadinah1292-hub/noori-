@@ -1,4 +1,4 @@
-# Validation status — development build 0.1.0
+# Validation status — development build 0.1.1
 
 This is not production acceptance. No claim of a delivered Windows binary, Cubase compatibility, or verified ARA integration is made by a source checkout.
 
@@ -28,3 +28,8 @@ Visual Studio 2022 x64 Release compilation; DSP tests; processor/editor smoke; G
 - [ ] Exercise installer missing/invalid bundle, permission denied, copy error, existing destination, normal install and uninstall.
 
 Release acceptance remains blocked until the unchecked host/audio tests pass. Report Windows build execution separately from ARA and Cubase acceptance.
+
+## 0.1.1 regression coverage and host retest
+Automated additions cover default 100% BPM targets with low confidence, non-zero project/PPQ origins at 44.1/48 kHz, exact off-grid reference matching, stereo click onset samples, rejection of impossible exact matches, actual undo/redo buffer restoration, manual edit history/redo branching, reference-file import anchoring and saved reference persistence. These checks do not establish Cubase acceptance.
+
+Retest in Cubase: import vocal and rendered click with their correct cursor origins; inspect original/corrected/reference lanes together; match selected attacks to off-grid click transients; verify an impossible exact match keeps the previous result; listen through repeated Undo/Redo and original listening; save/reopen. Test host metadata changes without losing edit history. Grid alignment reports safety-limited attacks instead of claiming they reached the grid.

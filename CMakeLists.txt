@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(NooriTurabTempo VERSION 0.1.0 LANGUAGES C CXX)
+project(NooriTurabTempo VERSION 0.1.1 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 option(NOORI_BUILD_PLUGIN "Build the Windows VST3 (other systems: compile-check only)" ON)
@@ -43,9 +43,11 @@ if(NOORI_BUILD_PLUGIN)
   COMPANY_NAME "Noori Turab" COMPANY_WEBSITE "https://github.com/sagemadinah1292-hub/noori-" BUNDLE_ID "audio.nooriturab.tempo" PLUGIN_MANUFACTURER_CODE Ntur
   PLUGIN_CODE Ntmp PRODUCT_NAME "NooriTurabTempo" FORMATS ${NOORI_FORMATS}
   IS_SYNTH FALSE NEEDS_MIDI_INPUT FALSE NEEDS_MIDI_OUTPUT FALSE
+  EDITOR_WANTS_KEYBOARD_FOCUS TRUE
   COPY_PLUGIN_AFTER_BUILD FALSE IS_ARA_EFFECT ${NOORI_ENABLE_ARA}
-  ARA_FACTORY_ID "\"audio.nooriturab.tempo.factory.0.1.0\""
-  ARA_DOCUMENT_ARCHIVE_ID "\"audio.nooriturab.tempo.archive.1\""
+  ARA_FACTORY_ID "\"audio.nooriturab.tempo.factory.0.1.1\""
+  ARA_DOCUMENT_ARCHIVE_ID "\"audio.nooriturab.tempo.archive.2\""
+  ARA_COMPATIBLE_ARCHIVE_IDS "\"audio.nooriturab.tempo.archive.1\""
   VST3_CATEGORIES Fx Tools)
  target_sources(NooriTurabTempo PRIVATE Source/PluginProcessor.cpp Source/PluginEditor.cpp Source/ARAIntegration.cpp)
  target_link_libraries(NooriTurabTempo PRIVATE noori_dsp juce::juce_audio_utils PUBLIC juce::juce_recommended_config_flags)

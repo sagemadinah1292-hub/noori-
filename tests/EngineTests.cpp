@@ -23,6 +23,20 @@ int main(int argc,char** argv) {try {
   auto a=tone(sr,220,4,2);auto onset=(Sample)(.81*sr);Attacks markers{{onset,onset,1,1,true}};
   auto q=quantize(markers,a.length(),0,Timeline(sr),s);
   require(std::abs(q[0].target-(Sample)std::llround(.75*sr))<=1,"80 BPM eighth-note grid");
+  // Default settings now honour 100% strength, independent of detector confidence.
+  auto defaults=Settings{};auto lowConfidence=markers;lowConfidence[0].confidence=.1f;
+  require(quantize(lowConfidence,a.length(),0,Timeline(sr),defaults)[0].target==q[0].target,"Default 100 percent exact grid alignment");
+  auto projectStart=(Sample)std::llround(sr*7.25);Timeline anchored(sr,{{projectStart,120,11.5}});
+  auto shifted=quantize(markers,a.length(),projectStart,anchored,defaults);
+  require(shifted[0].target==anchored.sampleAt(13)-projectStart,"Non-zero project time and PPQ grid phase");
+  std::vector<Sample> clicks{(Sample)std::llround(sr*.79),(Sample)std::llround(sr*1.17)};
+  auto ref=quantize(lowConfidence,a.length(),projectStart,anchored,defaults,false,clicks);
+  require(ref[0].target==clicks[0],"Exact off-grid reference click, not inferred BPM");
+  Audio clickAudio{sr,std::vector<std::vector<float>>(2,std::vector<float>((std::size_t)(sr*2)))};
+  for(auto at:clicks){clickAudio.channels[1][(std::size_t)at]=.8f;clickAudio.channels[1][(std::size_t)at+1]=.4f;}
+  require(detectClicks(clickAudio)==clicks,"Stereo reference onset sample accuracy");
+  auto impossible=false;try{quantize(markers,a.length(),0,Timeline(sr),defaults,false,{1});}catch(...){impossible=true;}
+  require(impossible,"Impossible exact reference match rejected without partial success");
   s.strength=0;require(quantize(markers,a.length(),0,Timeline(sr),s)[0].target==onset,"Zero strength");s.strength=1;
   for(auto r:{Settings::Rhythm::straight,Settings::Rhythm::triplet,Settings::Rhythm::dotted}){s.rhythm=r;auto x=quantize(markers,a.length(),0,Timeline(sr),s);require(x[0].target>0,"Rhythm variants");}s.rhythm=Settings::Rhythm::straight;
   Attacks selected{{(Sample)(sr*.5),(Sample)(sr*.5),1,1,false},{(Sample)(sr*.9),(Sample)(sr*.9),1,1,true},{(Sample)(sr*1.4),(Sample)(sr*1.4),1,1,false}};

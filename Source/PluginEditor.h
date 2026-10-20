@@ -9,6 +9,7 @@ class NooriEditor final : public juce::AudioProcessorEditor,
 public:
  explicit NooriEditor(NooriProcessor&);~NooriEditor()override;
  void paint(juce::Graphics&)override;void resized()override;
+ bool keyPressed(const juce::KeyPress&)override;
 private:
  class WaveView final : public juce::Component {
  public:
@@ -24,9 +25,11 @@ private:
  juce::LookAndFeel_V4 look;
  WaveView waveform,overview;
  juce::TextButton importButton{"Import vocal"},captureButton{"Capture"},analyseButton{"Detect attacks"},exportButton{"Export WAV"};
- juce::TextButton undoButton{"Undo"},redoButton{"Redo"},compareButton{"Compare original"},settingsButton{"Settings"};
+ juce::TextButton undoButton{"Undo"},redoButton{"Redo"},compareButton{"Listen original"},settingsButton{"Settings"};
  juce::TextButton attackTab{"Attack"},pitchTab{"Pitch"},levelTab{"Level"},selectedButton{"Align selected attacks"},alignButton{"ALIGN ALL ATTACKS TO GRID"};
  juce::ToggleButton sampleAccurate{"Sample accurate"},breath{"Breath protection"},consonant{"Consonant protection"},vowel{"Long vowel protection"},emotion{"Emotional phrase protection"},audition{"Audition with Cubase transport"};
+ juce::TextButton referenceButton{"Import metronome click"};
+ juce::ComboBox matchTarget;
  juce::ComboBox grid,rhythm,mode,presets;
  juce::Slider sensitivity,strength,humanize,tolerance,swing,offset,zoom;
  juce::Label gridLabel,rhythmLabel,modeLabel,sensitivityLabel,strengthLabel,humanizeLabel,toleranceLabel,swingLabel,offsetLabel;
@@ -37,6 +40,7 @@ private:
  void scrollBarMoved(juce::ScrollBar*,double start)override;
  void timerCallback()override;void syncControls();void pullControls();void chooseFile(bool save);
  void setupSlider(juce::Slider&,juce::Label&,juce::String,double,double,double,juce::String suffix={});
+ void syncTempo();
  void bindSession(std::shared_ptr<EditSession>);void updateScroll();
  JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(NooriEditor)
 };

@@ -70,9 +70,9 @@ protected:
  void didEndEditing(ARADocument*)override {editing=false;lock.exitWrite();}
  ARAAudioModification* doCreateAudioModification(ARAAudioSource* s,ARA::ARAAudioModificationHostRef ref,const ARAAudioModification* clone)override{return new NooriModification(s,ref,clone);}
  ARAPlaybackRenderer* doCreatePlaybackRenderer()override{return new NooriRenderer(getDocumentController(),lock);}
- void doUpdateAudioSourceContent(ARAAudioSource* s,ARAContentUpdateScopes)override {for(auto* m:s->getAudioModifications<NooriModification>()){m->needsLoad=true;m->session->cancel();}}
+ void doUpdateAudioSourceContent(ARAAudioSource* s,ARAContentUpdateScopes scopes)override {if(!scopes.affectSamples())return;for(auto* m:s->getAudioModifications<NooriModification>()){m->needsLoad=true;m->session->cancel();}}
  void didUpdatePlaybackRegionProperties(ARAPlaybackRegion* r)override {r->getAudioModification<NooriModification>()->needsTimeline=true;}
- void didUpdateAudioSourceProperties(ARAAudioSource* s)override {doUpdateAudioSourceContent(s,ARAContentUpdateScopes::samplesAreAffected());}
+ void didUpdateAudioSourceProperties(ARAAudioSource* s)override {for(auto* m:s->getAudioModifications<NooriModification>()){auto a=m->session->original;if(!a||a->length()!=s->getSampleCount()||a->channels.size()!=(std::size_t)s->getChannelCount()||std::abs(a->sampleRate-s->getSampleRate())>.1){m->needsLoad=true;m->session->cancel();}else m->session->name=String::fromUTF8(s->getName());}}
  void doUpdateMusicalContextContent(ARAMusicalContext*,ARAContentUpdateScopes)override {for(auto* s:getDocument()->getAudioSources<ARAAudioSource>())for(auto* m:s->getAudioModifications<NooriModification>())m->needsTimeline=true;}
  bool doStoreObjectsToStream(ARAOutputStream& out,const ARAStoreObjectsFilter* filter)override {
   const auto& mods=filter->getAudioModificationsToStore<NooriModification>();if(!out.writeInt(1)||!out.writeInt((int)mods.size()))return false;
@@ -88,7 +88,7 @@ private:
  ReadWriteLock lock;bool editing=false;
  void updateTimeline(NooriModification* m,ARAPlaybackRegion* r) {
   if(m->session->busy)return;
-  double rate=m->getAudioSource()->getSampleRate();m->session->origin=(noori::Sample)std::llround((r->getStartInPlaybackTime()-r->getStartInAudioModificationTime())*rate);
+  double rate=m->getAudioSource()->getSampleRate();auto oldOrigin=m->session->origin;m->session->origin=(noori::Sample)std::llround((r->getStartInPlaybackTime()-r->getStartInAudioModificationTime())*rate);for(auto& click:m->session->referenceClicks)click+=oldOrigin-m->session->origin;
   auto* sequence=r->getRegionSequence();
   if(auto* context=sequence?sequence->getMusicalContext():nullptr) {
    ARA::PlugIn::HostContentReader<ARA::kARAContentTypeTempoEntries> reader(context);
