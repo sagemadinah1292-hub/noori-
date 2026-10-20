@@ -1,7 +1,11 @@
 #pragma once
 #include "PluginProcessor.h"
 #include "ARAIntegration.h"
-class NooriEditor final : public juce::AudioProcessorEditor,private juce::Timer,private juce::ScrollBar::Listener {
+class NooriEditor final : public juce::AudioProcessorEditor,
+#if JucePlugin_Enable_ARA
+ public juce::AudioProcessorEditorARAExtension,
+#endif
+ private juce::Timer,private juce::ScrollBar::Listener {
 public:
  explicit NooriEditor(NooriProcessor&);~NooriEditor()override;
  void paint(juce::Graphics&)override;void resized()override;

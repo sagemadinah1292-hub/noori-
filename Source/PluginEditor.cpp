@@ -4,7 +4,11 @@ namespace {
 const juce::Colour bg(0xff14121d),panel(0xff1c1928),line(0xff353044),muted(0xff9690aa),purple(0xff8868ff),ink(0xfff2efff);
 void text(juce::Graphics& g,const juce::String& s,juce::Rectangle<int> b,float size,juce::Colour c=ink,int justify=juce::Justification::centredLeft){g.setColour(c);g.setFont(juce::FontOptions(size));g.drawText(s,b,justify,true);}
 }
-NooriEditor::NooriEditor(NooriProcessor& p):AudioProcessorEditor(p),processor(p),session(p.insertSession),waveform(*this),overview(*this,true) {
+NooriEditor::NooriEditor(NooriProcessor& p):AudioProcessorEditor(p),
+#if JucePlugin_Enable_ARA
+ AudioProcessorEditorARAExtension(&p),
+#endif
+ processor(p),session(p.insertSession),waveform(*this),overview(*this,true) {
  setLookAndFeel(&look);look.setColour(juce::TextButton::buttonColourId,juce::Colour(0xff30293f));look.setColour(juce::TextButton::textColourOffId,ink);look.setColour(juce::ComboBox::backgroundColourId,juce::Colour(0xff30293f));look.setColour(juce::Slider::thumbColourId,purple);look.setColour(juce::Slider::trackColourId,purple);look.setColour(juce::ToggleButton::tickColourId,purple);
  for(auto* c:std::initializer_list<juce::Component*>{&waveform,&overview,&importButton,&captureButton,&analyseButton,&exportButton,&undoButton,&redoButton,&compareButton,&settingsButton,&attackTab,&pitchTab,&levelTab,&selectedButton,&alignButton,&sampleAccurate,&breath,&consonant,&vowel,&emotion,&audition,&grid,&rhythm,&mode,&presets,&scroll,&zoom})addAndMakeVisible(c);
  pitchTab.setEnabled(false);pitchTab.setTooltip("Pitch editing is not implemented in this development build.");
