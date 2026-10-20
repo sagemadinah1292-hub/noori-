@@ -10,7 +10,7 @@ Experimental C++20/JUCE Windows x64 VST3 vocal attack editor, intended for Cubas
 - Piecewise monotonic time warp with fixed endpoints and bounded local stretch. Signalsmith Stretch at unity pitch, compensated input/output latency, shared stereo processing, and crossfaded unity-rate islands around protected consonants.
 - Naat/voice heuristics, emotional confidence weighting, breath/noise rejection and sustained-voicing suppression. These controls influence analysis or timing; they are not trained Urdu classifiers.
 - Worker-thread analysis/rendering, cancellation in the session API, immutable audio snapshots for realtime playback, Undo/Redo, original comparison, float-accurate source/marker persistence, mono/stereo and 24-bit WAV export.
-- Official ARA SDK 2.1.0/JUCE factory, source reading, playback renderer, selected region binding, tempo content reading and per-modification archives. Compiling this code does **not** verify Cubase 15 ARA support or correct host integration.
+- Official ARA SDK 2.2.0/JUCE factory, source reading, playback renderer, selected region binding, tempo content reading and per-modification archives. Compiling this code does **not** verify Cubase 15 ARA support or correct host integration.
 
 Pitch tab is disabled because pitch editing is not implemented. Level tab displays RMS amplitude; it does not edit gain. No pitch or phoneme recognition is claimed. No proprietary RePitch assets/code are used.
 
@@ -39,7 +39,7 @@ ctest --test-dir build -C Release --output-on-failure
 ./scripts/Package.ps1
 ```
 
-The workflow at `.github/workflows/windows.yml` runs the same steps on `windows-2022` on push, PR or manual dispatch. It uploads `Noori-Turab-Tempo-Windows-x64.zip` only after successful compilation, tests, GUI preview generation and PE32+ AMD64 DLL validation. No Windows plugin is fabricated if that job cannot run. The build fetches pinned JUCE 8.0.12, Signalsmith Stretch and Linear 0.6.4, and official ARA 2.1.0 sources. JUCE includes the Steinberg VST3 headers.
+The workflow at `.github/workflows/windows.yml` runs the same steps on `windows-2022` on push, PR or manual dispatch. It uploads `Noori-Turab-Tempo-Windows-x64.zip` only after successful compilation, tests, GUI preview generation and PE32+ AMD64 DLL validation. No Windows plugin is fabricated if that job cannot run. The build fetches pinned JUCE 8.0.12, Signalsmith Stretch and Linear 0.6.4, and official ARA 2.2.0 sources. JUCE includes the Steinberg VST3 headers.
 
 The generated package contains the genuine `.vst3` bundle, Install.bat, Verify-PE.ps1, README.md, BUILD-INFO.json, VALIDATION.md, a screenshot of the actual editor and license notices. Close Cubase; run Install.bat as Administrator. Default destination is `C:\Program Files\Common Files\VST3\NooriTurabTempo.vst3`. Existing bundles must be moved aside manually; installer refuses to overwrite. Uninstall by closing Cubase and removing that one bundle.
 
