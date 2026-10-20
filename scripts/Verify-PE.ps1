@@ -1,5 +1,6 @@
 param([Parameter(Mandatory=$true)][string]$Module)
 $ErrorActionPreference = 'Stop'
+if (![Environment]::Is64BitOperatingSystem) { throw 'Windows x64 is required' }
 $bytes = [IO.File]::ReadAllBytes((Resolve-Path $Module))
 if ($bytes.Length -lt 256 -or $bytes[0] -ne 0x4d -or $bytes[1] -ne 0x5a) { throw 'Missing MZ DOS signature' }
 $pe = [BitConverter]::ToInt32($bytes, 0x3c)

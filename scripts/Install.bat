@@ -2,7 +2,9 @@
 setlocal EnableExtensions DisableDelayedExpansion
 set "BUNDLE=%~dp0NooriTurabTempo.vst3"
 set "MODULE=%BUNDLE%\Contents\x86_64-win\NooriTurabTempo.vst3"
-set "DEST=%CommonProgramFiles%\VST3\NooriTurabTempo.vst3"
+set "VST3ROOT=%CommonProgramFiles%\VST3"
+if defined CommonProgramW6432 set "VST3ROOT=%CommonProgramW6432%\VST3"
+set "DEST=%VST3ROOT%\NooriTurabTempo.vst3"
 if not exist "%MODULE%" (
   echo ERROR: Windows x64 VST3 bundle is missing: "%MODULE%"
   exit /b 2
