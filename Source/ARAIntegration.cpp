@@ -76,7 +76,7 @@ protected:
  void doUpdateMusicalContextContent(ARAMusicalContext*,ARAContentUpdateScopes)override {for(auto* s:getDocument()->getAudioSources<ARAAudioSource>())for(auto* m:s->getAudioModifications<NooriModification>())m->needsTimeline=true;}
  bool doStoreObjectsToStream(ARAOutputStream& out,const ARAStoreObjectsFilter* filter)override {
   const auto& mods=filter->getAudioModificationsToStore<NooriModification>();if(!out.writeInt(1)||!out.writeInt((int)mods.size()))return false;
-  for(auto* m:mods){auto state=m->session->archive(false);if(!out.writeString(m->getPersistentID())||!out.writeInt64((juce::int64)state.getSize())||!out.write(state.getData(),state.getSize()))return false;}
+  for(auto* m:mods){auto state=m->session->archive(false);if(!out.writeString(String::fromUTF8(m->getPersistentID()))||!out.writeInt64((juce::int64)state.getSize())||!out.write(state.getData(),state.getSize()))return false;}
   return true;
  }
  bool doRestoreObjectsFromStream(ARAInputStream& in,const ARARestoreObjectsFilter* filter)override {
@@ -112,7 +112,7 @@ private:
     auto reader=std::shared_ptr<ARAAudioSourceReader>(new ARAAudioSourceReader(source),[](ARAAudioSourceReader* ptr){if(MessageManager::existsAndIsCurrentThread())delete ptr;else MessageManager::callAsync([ptr]{delete ptr;});});
     if(!m->getPlaybackRegions().empty())updateTimeline(m,m->getPlaybackRegions().front());
     m->needsLoad=false;
-    m->session->load([reader,n,nc,sr]{noori::Audio a{sr,std::vector<std::vector<float>>((std::size_t)nc,std::vector<float>((std::size_t)n))};AudioBuffer<float> block(nc,65536);for(juce::int64 at=0;at<n;){int size=(int)std::min<juce::int64>(65536,n-at);if(!reader->read(&block,0,size,at,true,true))throw std::runtime_error("ARA source access revoked or read failed");for(int c=0;c<nc;++c)std::memcpy(a.channels[(std::size_t)c].data()+at,block.getReadPointer(c),(std::size_t)size*sizeof(float));at+=size;}return a;},String(source->getName()),m->session->origin,m->session->timeline);
+    m->session->load([reader,n,nc,sr]{noori::Audio a{sr,std::vector<std::vector<float>>((std::size_t)nc,std::vector<float>((std::size_t)n))};AudioBuffer<float> block(nc,65536);for(juce::int64 at=0;at<n;){int size=(int)std::min<juce::int64>(65536,n-at);if(!reader->read(&block,0,size,at,true,true))throw std::runtime_error("ARA source access revoked or read failed");for(int c=0;c<nc;++c)std::memcpy(a.channels[(std::size_t)c].data()+at,block.getReadPointer(c),(std::size_t)size*sizeof(float));at+=size;}return a;},String::fromUTF8(source->getName()),m->session->origin,m->session->timeline);
    }
   }
  }

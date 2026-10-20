@@ -20,8 +20,8 @@ EditSession::EditSession(){startTimerHz(20);}
 EditSession::~EditSession(){stopTimer();cancelled=true;pool.removeAllJobs(true,-1);}
 void EditSession::submit(std::function<Result()> job) {
  if(busy.exchange(true))return;
- cancelled=false;progress=0;status="Working…";
- pool.addJob([this,job=std::move(job)] {Result result;try{result=job();}catch(const std::exception& e){result.error=e.what();}catch(...){result.error="Processing failed";}std::lock_guard lock(pendingMutex);pending=std::make_unique<Result>(std::move(result));});
+ cancelled=false;progress=0;status="Working...";
+ pool.addJob([this,job=std::move(job)] {Result result;try{result=job();}catch(const std::exception& e){result.error=juce::String::fromUTF8(e.what());}catch(...){result.error="Processing failed";}std::lock_guard lock(pendingMutex);pending=std::make_unique<Result>(std::move(result));});
 }
 void EditSession::timerCallback(){settle();}
 void EditSession::settle() {
@@ -29,7 +29,7 @@ void EditSession::settle() {
  if(cancelled){status="Cancelled";busy=false;return;}
  if(result->error.isNotEmpty()){status=result->error;busy=false;return;}
  if(result->newSource){if(original)retired.push_back({{},original});for(auto& r:history)retired.push_back(std::move(r));history.clear();current=-1;original=result->source;restoreMarkers.clear();originalAudible=original.get();realtimeOrigin=origin;}
- publish(std::move(result->revision));busy=false;status=juce::String((int)attacks.size())+" attacks • ready";if(onChanged)onChanged();
+ publish(std::move(result->revision));busy=false;status=juce::String((int)attacks.size())+" attacks | ready";if(onChanged)onChanged();
 }
 void EditSession::publish(Revision r) {
  if(current+1<(int)history.size()){for(auto i=current+1;i<(int)history.size();++i)retired.push_back(std::move(history[(std::size_t)i]));history.resize((std::size_t)(current+1));}
@@ -59,7 +59,7 @@ void EditSession::align(bool selectedOnly) {
  auto bytes=(std::size_t)input->length()*input->channels.size()*sizeof(float);if(retainedBytes+bytes>memoryLimit){status="History memory limit reached.";return;}
  submit([this,input,map,s,start,m=std::move(m),selectedOnly,bytes]()mutable{Result r;if(m.empty())m=noori::detect(*input,s,[this](float p){progress=p*.35f;return !cancelled.load();});r.revision.attacks=noori::quantize(m,input->length(),start,map,s,selectedOnly);r.revision.audio=std::make_shared<noori::Audio>(noori::render(*input,r.revision.attacks,s,[this](float p){progress=.35f+.65f*p;return !cancelled.load();}));retainedBytes+=bytes;return r;});
 }
-void EditSession::move(std::size_t index,noori::Sample target){if(original&&!busy)try{renderMarkers(noori::moveAttack(attacks,index,target,original->length(),settings.maxStretch));}catch(const std::exception& e){status=e.what();}}
+void EditSession::move(std::size_t index,noori::Sample target){if(original&&!busy)try{renderMarkers(noori::moveAttack(attacks,index,target,original->length(),settings.maxStretch));}catch(const std::exception& e){status=juce::String::fromUTF8(e.what());}}
 void EditSession::setSelected(std::size_t i,bool additive){if(busy||i>=attacks.size())return;for(std::size_t j=0;j<attacks.size();++j)attacks[j].selected=j==i|| (additive&&attacks[j].selected);}
 void EditSession::reset(){if(original&&!busy)publish({{},original});}
 bool EditSession::canUndo()const{return !busy&&current>0;}bool EditSession::canRedo()const{return !busy&&current+1<(int)history.size();}
@@ -80,7 +80,7 @@ void EditSession::restore(const void* data,std::size_t size,bool includeAudio) {
   if(hasAudio&&includeAudio) {
    auto a=std::make_shared<noori::Audio>();a->sampleRate=in.readDouble();int channels=in.readInt();auto n=in.readInt64();if(channels<1||channels>2||n<1||n>128*1024*1024/(channels*4)||in.getNumBytesRemaining()<n*channels*4)throw std::runtime_error("Invalid audio archive");a->channels.resize((std::size_t)channels);for(auto& c:a->channels){c.resize((std::size_t)n);for(auto& x:c)x=in.readFloat();}load([a]{return *a;},title,start,map);
   }
- }catch(const std::exception& e){status=e.what();}
+ }catch(const std::exception& e){status=juce::String::fromUTF8(e.what());}
 }
 NooriProcessor::NooriProcessor():AudioProcessor(BusesProperties().withInput("Vocal input",juce::AudioChannelSet::stereo(),true).withOutput("Output",juce::AudioChannelSet::stereo(),true)),insertSession(std::make_shared<EditSession>()){}
 NooriProcessor::~NooriProcessor(){captureArmed=false;}

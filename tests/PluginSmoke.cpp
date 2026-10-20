@@ -18,7 +18,7 @@ int main(int argc,char** argv){try{
  NooriProcessor p;HostTransport host;p.setPlayHead(&host);p.prepareToPlay(48000,512);juce::AudioBuffer<float> b(2,512);juce::MidiBuffer midi;b.clear();p.processBlock(b,midi);check(p.bpm==80&&p.numerator==6&&p.denominator==8,"Host tempo/time signature");
  auto audio=std::make_shared<noori::Audio>();audio->sampleRate=48000;audio->channels.resize(2,std::vector<float>(48000*4));
  for(auto& c:audio->channels)for(int i=0;i<(int)c.size();++i){double time=i/48000.;double phase=std::fmod(time,.75);double envelope=phase<.04?phase/.04:phase<.50?std::exp(-(phase-.04)*4):0;c[(std::size_t)i]=float(.55*envelope*(std::sin(2*std::numbers::pi*180*time)+.2*std::sin(2*std::numbers::pi*360*time)));}
- p.insertSession->load([audio]{return *audio;},"Synthetic test vocal • 48 kHz",0,noori::Timeline());waitSession(p.insertSession);p.insertSession->align();waitSession(p.insertSession);check(!p.insertSession->attacks.empty(),"Attack analysis");
+ p.insertSession->load([audio]{return *audio;},"Synthetic test vocal | 48 kHz",0,noori::Timeline());waitSession(p.insertSession);p.insertSession->align();waitSession(p.insertSession);check(!p.insertSession->attacks.empty(),"Attack analysis");
  auto wav=juce::File::getSpecialLocation(juce::File::tempDirectory).getNonexistentChildFile("noori-export-test",".wav");
  p.exportFile(wav,p.insertSession);p.exportFile(wav,p.insertSession);juce::AudioFormatManager formats;formats.registerBasicFormats();{std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(wav));check(reader&&reader->bitsPerSample==24&&reader->lengthInSamples==audio->length(),"Repeated 24-bit export replaces file correctly");}wav.deleteFile();
  check(p.insertSession->canUndo(),"Undo available");auto attacks=p.insertSession->attacks;p.insertSession->undo();check(p.insertSession->attacks.empty(),"Undo restored original");p.insertSession->redo();check(p.insertSession->attacks.size()==attacks.size(),"Redo restored edits");
@@ -26,7 +26,7 @@ int main(int argc,char** argv){try{
  p.audition=true;host.sample=48000;p.processBlock(b,midi);double energy=0;for(int i=0;i<b.getNumSamples();++i)energy+=std::abs(b.getSample(0,i));check(energy>1,"Host-synchronized audition");
  p.beginCapture();for(int block=0;block<20;++block){host.sample=block*512;b.clear();b.addFrom(0,0,audio->channels[0].data()+block*512,512);b.addFrom(1,0,audio->channels[1].data()+block*512,512);p.processBlock(b,midi);}p.finishCapture();waitSession(p.insertSession);check(p.insertSession->original->length()==10240,"Capture stream length");
  // Reopen test fixture for a screenshot of the actual editor, not a design mockup.
- p.insertSession->load([audio]{return *audio;},"Synthetic test vocal • 48 kHz",0,noori::Timeline());waitSession(p.insertSession);p.insertSession->analyse();waitSession(p.insertSession);
+ p.insertSession->load([audio]{return *audio;},"Synthetic test vocal | 48 kHz",0,noori::Timeline());waitSession(p.insertSession);p.insertSession->analyse();waitSession(p.insertSession);
  std::unique_ptr<juce::AudioProcessorEditor> editor(p.createEditor());check(editor->getWidth()>=1100,"Editor dimensions");
 #if JucePlugin_Enable_ARA
  check(dynamic_cast<juce::AudioProcessorEditorARAExtension*>(editor.get())!=nullptr,"ARA editor lifecycle extension");

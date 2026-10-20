@@ -61,9 +61,9 @@ void NooriEditor::scrollBarMoved(juce::ScrollBar*,double start){viewStart=start;
 void NooriEditor::updateScroll(){scroll.setRangeLimits(0,1);scroll.setCurrentRange(viewStart,viewFraction,juce::dontSendNotification);}
 void NooriEditor::paint(juce::Graphics& g){g.fillAll(bg);g.setColour(panel);g.fillRoundedRectangle(side.toFloat(),8);g.fillRoundedRectangle(editorArea.toFloat(),8);
  text(g,"NOORI TURAB",{22,15,230,27},24);text(g,"TEMPO",{222,15,100,27},24,purple);text(g,"Preserve the Emotion. Perfect the Timing.",{23,43,490,20},12,muted);
- text(g,juce::String(processor.bpm.load(),2)+" BPM  •  "+juce::String(processor.numerator.load())+"/"+juce::String(processor.denominator.load()),{getWidth()-268,17,245,25},17,purple,juce::Justification::centredRight);text(g,processor.hostTempoValid?"CUBASE TRANSPORT":"80 BPM FALLBACK • NO HOST TEMPO",{getWidth()-340,43,316,20},11,muted,juce::Justification::centredRight);
+ text(g,juce::String(processor.bpm.load(),2)+" BPM  |  "+juce::String(processor.numerator.load())+"/"+juce::String(processor.denominator.load()),{getWidth()-268,17,245,25},17,purple,juce::Justification::centredRight);text(g,processor.hostTempoValid?"CUBASE TRANSPORT":"80 BPM FALLBACK | NO HOST TEMPO",{getWidth()-340,43,316,20},11,muted,juce::Justification::centredRight);
  text(g,"TRACKS",{side.getX()+15,150,230,20},11,muted);g.setColour(juce::Colour(0xff322943));g.fillRoundedRectangle((float)side.getX()+13,174,(float)side.getWidth()-26,37,4);text(g,session->name,{side.getX()+23,181,side.getWidth()-44,24},13);
- text(g,"ATTACK SETTINGS",{side.getX()+15,225,235,22},12);text(g,levelView?"LEVEL • amplitude view (read only)":"ATTACK • drag markers to adjust timing",{editorArea.getX()+14,122,editorArea.getWidth()-30,24},12,muted);
+ text(g,"ATTACK SETTINGS",{side.getX()+15,225,235,22},12);text(g,levelView?"LEVEL | amplitude view (read only)":"ATTACK | drag markers to adjust timing",{editorArea.getX()+14,122,editorArea.getWidth()-30,24},12,muted);
  auto status=processor.captureArmed?processor.captureStatus():session->status;if(session->busy)status+="  "+juce::String((int)(session->progress*100))+"%";text(g,status,{22,getHeight()-34,getWidth()-45,23},12,muted);
  if(session->busy){g.setColour(purple);g.fillRect(22,getHeight()-9,(int)((getWidth()-44)*session->progress.load()),2);}
 }

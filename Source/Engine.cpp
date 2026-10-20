@@ -13,7 +13,7 @@ namespace noori {
 static constexpr double pi = std::numbers::pi;
 void Audio::validate() const {
  if ((channels.size()!=1 && channels.size()!=2) || !std::isfinite(sampleRate) || sampleRate<8000 || sampleRate>192000 || length()<=0)
-  throw std::invalid_argument("Expected finite mono/stereo audio, 8–192 kHz");
+  throw std::invalid_argument("Expected finite mono/stereo audio, 8-192 kHz");
  for (const auto& c:channels) {
   if ((Sample)c.size()!=length()) throw std::invalid_argument("Channel lengths differ");
   for(float s:c) if(!std::isfinite(s)) throw std::invalid_argument("Non-finite audio");
