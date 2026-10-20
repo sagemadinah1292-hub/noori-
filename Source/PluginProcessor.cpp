@@ -28,7 +28,7 @@ void EditSession::settle() {
  std::unique_ptr<Result> result;{std::lock_guard lock(pendingMutex);result=std::move(pending);}if(!result)return;
  if(cancelled){status="Cancelled";busy=false;return;}
  if(result->error.isNotEmpty()){status=result->error;busy=false;return;}
- if(result->newSource){if(original)retired.push_back({{},original});for(auto& r:history)retired.push_back(std::move(r));history.clear();current=-1;original=result->source;originalAudible=original.get();realtimeOrigin=origin;}
+ if(result->newSource){if(original)retired.push_back({{},original});for(auto& r:history)retired.push_back(std::move(r));history.clear();current=-1;original=result->source;restoreMarkers.clear();originalAudible=original.get();realtimeOrigin=origin;}
  publish(std::move(result->revision));busy=false;status=juce::String((int)attacks.size())+" attacks • ready";if(onChanged)onChanged();
 }
 void EditSession::publish(Revision r) {
@@ -38,8 +38,9 @@ void EditSession::publish(Revision r) {
 }
 void EditSession::load(std::function<noori::Audio()> reader,juce::String title,noori::Sample start,noori::Timeline map) {
  if(busy)return;name=title;origin=start;timeline=std::move(map);
- submit([this,reader=std::move(reader)] {Result r;auto a=std::make_shared<noori::Audio>(reader());a->validate();auto bytes=(std::size_t)a->length()*a->channels.size()*sizeof(float);if(bytes>128ull*1024*1024||retainedBytes+bytes>memoryLimit)throw std::runtime_error("Audio/session memory limit reached; open a new instance.");retainedBytes+=bytes;r.newSource=true;r.source=a;r.revision.audio=a;
- if(!restoreMarkers.empty()){r.revision.attacks=noori::deserializeAttacks(restoreMarkers,a->length());auto output=std::make_shared<noori::Audio>(noori::render(*a,r.revision.attacks,settings));r.revision.audio=output;restoreMarkers.clear();retainedBytes+=bytes;}
+ const auto markerState=restoreMarkers;const auto renderSettings=settings;
+ submit([this,reader=std::move(reader),markerState,renderSettings] {Result r;auto a=std::make_shared<noori::Audio>(reader());a->validate();auto bytes=(std::size_t)a->length()*a->channels.size()*sizeof(float);if(bytes>128ull*1024*1024||retainedBytes+bytes>memoryLimit)throw std::runtime_error("Audio/session memory limit reached; open a new instance.");retainedBytes+=bytes;r.newSource=true;r.source=a;r.revision.audio=a;
+ if(!markerState.empty()){r.revision.attacks=noori::deserializeAttacks(markerState,a->length());auto output=std::make_shared<noori::Audio>(noori::render(*a,r.revision.attacks,renderSettings));r.revision.audio=output;retainedBytes+=bytes;}
  return r;});
 }
 void EditSession::analyse() {
@@ -66,7 +67,7 @@ void EditSession::undo(){if(canUndo()){--current;attacks=history[(std::size_t)cu
 void EditSession::redo(){if(canRedo()){++current;attacks=history[(std::size_t)current].attacks;audible=history[(std::size_t)current].audio.get();if(onChanged)onChanged();}}
 void EditSession::cancel(){cancelled=true;}
 juce::MemoryBlock EditSession::archive(bool includeAudio)const {
- juce::MemoryOutputStream out;out.writeInt(0x4e545431);writeSettings(out,settings);out.writeString(name);out.writeInt64(origin);out.writeString(noori::serializeAttacks(attacks));out.writeDouble(timeline.sampleRate());out.writeInt((int)timeline.points().size());for(auto t:timeline.points()){out.writeInt64(t.sample);out.writeDouble(t.bpm);out.writeDouble(t.quarter);}
+ juce::MemoryOutputStream out;out.writeInt(0x4e545431);writeSettings(out,settings);out.writeString(name);out.writeInt64(origin);out.writeString(!original&&!restoreMarkers.empty()?restoreMarkers:noori::serializeAttacks(attacks));out.writeDouble(timeline.sampleRate());out.writeInt((int)timeline.points().size());for(auto t:timeline.points()){out.writeInt64(t.sample);out.writeDouble(t.bpm);out.writeDouble(t.quarter);}
  out.writeBool(includeAudio&&original!=nullptr);
  if(includeAudio&&original){out.writeDouble(original->sampleRate);out.writeInt((int)original->channels.size());out.writeInt64(original->length());for(const auto& c:original->channels)for(float x:c)out.writeFloat(x);}
  return out.getMemoryBlock();
