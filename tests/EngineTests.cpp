@@ -35,6 +35,10 @@ int main(int argc,char** argv) {try {
   Audio clickAudio{sr,std::vector<std::vector<float>>(2,std::vector<float>((std::size_t)(sr*2)))};
   for(auto at:clicks){clickAudio.channels[1][(std::size_t)at]=.8f;clickAudio.channels[1][(std::size_t)at+1]=.4f;}
   require(detectClicks(clickAudio)==clicks,"Stereo reference onset sample accuracy");
+  Attacks group{{(Sample)std::llround(sr*.5),(Sample)std::llround(sr*.5),1,1,true},{(Sample)std::llround(sr*.78),(Sample)std::llround(sr*.78),1,1,true},{(Sample)std::llround(sr*1.5),(Sample)std::llround(sr*1.5),1,1,false}};
+  std::vector<Sample> groupClicks{(Sample)std::llround(sr*.6),(Sample)std::llround(sr*.9)};
+  auto groupResult=quantize(group,a.length(),0,Timeline(sr),defaults,true,groupClicks);
+  require(groupResult[0].target==groupClicks[0]&&groupResult[1].target==groupClicks[1]&&groupResult[2].target==group[2].target,"Simultaneous exact selected group preserves unselected anchors");
   auto impossible=false;try{quantize(markers,a.length(),0,Timeline(sr),defaults,false,{1});}catch(...){impossible=true;}
   require(impossible,"Impossible exact reference match rejected without partial success");
   s.strength=0;require(quantize(markers,a.length(),0,Timeline(sr),s)[0].target==onset,"Zero strength");s.strength=1;

@@ -172,10 +172,16 @@ Attacks quantize(const Attacks& attacks,Sample length,Sample origin,const Timeli
   if(!s.sampleAccurate)shift=(Sample)std::llround(double(shift)/(timeline.sampleRate()*.001))*(Sample)std::llround(timeline.sampleRate()*.001);
   a.target=a.source+shift;
  }
- if(selectedOnly){auto result=attacks;for(std::size_t i=0;i<out.size();++i)if(out[i].selected)result=moveAttack(result,i,out[i].target,length,s.maxStretch);if(!reference.empty())for(std::size_t i=0;i<out.size();++i)if(out[i].selected&&out[i].target!=result[i].target)throw std::runtime_error("Exact click match exceeds stretch limits. Select fewer attacks or increase the stretch limit.");return result;}
- auto constrained=constrain(out,length,std::clamp(s.maxStretch,1.,2.));
- if(!reference.empty())for(std::size_t i=0;i<out.size();++i)if(out[i].target!=constrained[i].target)throw std::runtime_error("Exact click match exceeds stretch limits or maps multiple attacks to one click. Select fewer attacks, use a finer click track, or increase the stretch limit.");
- return constrained;
+ if(!reference.empty()) {
+  // An exact reference request is a simultaneous set of anchors. Validate it
+  // directly; projecting one marker at a time can hide a collision or reject a
+  // valid selected group because its neighbours have not moved yet.
+  try {validateMarkers(out,length,s.maxStretch);}
+  catch(const std::exception&) {throw std::runtime_error("Exact click match exceeds stretch limits or maps multiple attacks to one click. Select fewer attacks, use a finer click track, or increase the stretch limit.");}
+  return out;
+ }
+ if(selectedOnly){auto result=attacks;for(std::size_t i=0;i<out.size();++i)if(out[i].selected)result=moveAttack(result,i,out[i].target,length,s.maxStretch);return result;}
+ return constrain(out,length,std::clamp(s.maxStretch,1.,2.));
 }
 Attacks moveAttack(const Attacks& a,std::size_t index,Sample target,Sample length,double limit) {
  validateMarkers(a,length,limit);if(index>=a.size())throw std::out_of_range("Marker index");auto out=a;
