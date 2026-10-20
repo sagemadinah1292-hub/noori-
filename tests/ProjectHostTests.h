@@ -40,7 +40,7 @@ inline void projectHostTests(const ARA::ARAFactory* factory,const juce::File& ou
  controller.endEditing();
  {
   std::cerr<<"ARA regression: bind processor\n";
-  NooriProcessor p;p.setRateAndBufferSizeDetails(48000,512);p.prepareToPlay(48000,512);p.bindToARA(instance->documentControllerRef,ARA::kARAEditorViewRole,ARA::kARAEditorViewRole);
+  auto processorStorage=std::make_unique<NooriProcessor>();auto& p=*processorStorage;p.bindToARA(instance->documentControllerRef,ARA::kARAPlaybackRendererRole|ARA::kARAEditorRendererRole|ARA::kARAEditorViewRole,ARA::kARAEditorViewRole);p.setRateAndBufferSizeDetails(48000,512);p.prepareToPlay(48000,512);
   std::cerr<<"ARA regression: enumerate tracks\n";
   auto tracks=availableProjectTracks(p);check(tracks.size()==2&&tracks[1].name=="Metronome project track","Enumerate actual ARA project tracks, including unselected reference");
   for(int i=0;i<2;++i){auto a=std::make_shared<noori::Audio>();a->sampleRate=48000;a->channels.resize(1,std::vector<float>(96000));for(auto sample:i?std::vector<int>{14400,38400,76800}:std::vector<int>{16800,40800,76800})for(int j=0;j<1200;++j)a->channels[0][(std::size_t)(sample+j)]=.8f*(float)std::exp(-j/300.)*(float)std::cos(2*std::numbers::pi*1000*j/48000.);auto s=tracks[(std::size_t)i].regions[0].session;s->load([a]{return *a;},tracks[(std::size_t)i].name,468000,noori::Timeline());waitSession(s);}
