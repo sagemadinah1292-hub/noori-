@@ -6,6 +6,7 @@ $module=Join-Path $bundle 'Contents/x86_64-win/NooriTurabTempo.vst3'
 if (!(Test-Path (Join-Path $BuildDir 'plugin-smoke.ok'))) { throw 'Missing successful plugin smoke validation' }
 if (!(Test-Path (Join-Path $BuildDir 'Preview.png'))) { throw 'Missing real editor preview' }
 if (!(Test-Path (Join-Path $BuildDir 'ProjectPreview.png'))) { throw 'Missing ARA project-track editor preview' }
+if (!(Test-Path (Join-Path $BuildDir 'DarkPreview.png'))) { throw 'Missing dark-theme preview' }
 $package=Join-Path $OutputDir 'Noori-Turab-Tempo-Windows-x64'
 New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
 if (Test-Path $package) { throw 'Package directory exists; use a clean output directory' }
@@ -13,9 +14,9 @@ New-Item -ItemType Directory -Path $package | Out-Null
 Copy-Item -Recurse $bundle $package
 Copy-Item "$PSScriptRoot/Install.bat", "$PSScriptRoot/Verify-PE.ps1", 'README.md', 'VALIDATION.md', 'LICENSE' $package
 Copy-Item -Recurse 'licenses', 'docs' $package
-Copy-Item (Join-Path $BuildDir 'Preview.png'), (Join-Path $BuildDir 'ProjectPreview.png') $package
+Copy-Item (Join-Path $BuildDir 'DarkPreview.png'), (Join-Path $BuildDir 'Preview.png'), (Join-Path $BuildDir 'ProjectPreview.png') $package
 $buildInfo=@{
- product='NOORI TURAB TEMPO';version='0.2.0';platform='Windows x64';format='VST3';
+ product='NOORI TURAB TEMPO';version='0.3.0';platform='Windows x64';format='VST3';
  commit=(& git rev-parse HEAD);built_utc=[DateTime]::UtcNow.ToString('o');
  pe_amd64_verified=$true;automated_dsp_tests='passed';processor_smoke='passed';
  cubase_pro_15_tested=$false;ara_extension_compiled=$true;ara_host_validation='Cubase not run';ara_in_process_host_test='passed';

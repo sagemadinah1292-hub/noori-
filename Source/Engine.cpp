@@ -54,7 +54,7 @@ static void fft(std::vector<std::complex<float>>& a) {
 static bool progress(const Progress& p,float v) {if(p && !p(v)) throw std::runtime_error("Cancelled");return true;}
 Attacks detect(const Audio& audio,const Settings& settings,Progress cb) {
  audio.validate();
- const int n=1024, hop=(int)std::llround(audio.sampleRate*.005);
+ const int n=settings.percussion?256:1024, hop=std::max(1,(int)std::llround(audio.sampleRate*(settings.percussion?.001:.005)));
  const auto count=audio.length();
  // Highest-energy channel avoids cancellation in polarity-inverted stereo recordings.
  std::size_t active=0; double best=0;
@@ -87,21 +87,24 @@ Attacks detect(const Audio& audio,const Settings& settings,Progress cb) {
   auto& f=frames[i]; const auto prev=frames[i-1].energy;
   double rise=std::max(0.,(f.energy-prev)/std::max(peak*.03,prev));
   f.score=.65*f.flux+.35*std::min(1.,rise);
-  if(settings.breathProtection && f.voice<.35 && f.noise>.22) f.score*=.3;
-  if(settings.vowelProtection && rise<.05 && f.voice>.65) f.score*=.45;
+  if(!settings.percussion && settings.breathProtection && f.voice<.35 && f.noise>.22) f.score*=.3;
+  if(!settings.percussion && settings.vowelProtection && rise<.05 && f.voice>.65) f.score*=.45;
  }
  for(std::size_t i=1;i+1<frames.size();++i) {
   const auto& f=frames[i];
   if(f.score<threshold || f.energy<peak*.035 || f.score<frames[i-1].score || f.score<frames[i+1].score)continue;
   Sample onset=f.at;
-  // Backtrack through envelope to consonant/energy start, no more than one FFT window.
-  const Sample lower=std::max<Sample>(0,onset-n);
-  const double level=std::max(peak*.008,f.energy*.08);
-  while(onset>lower && std::abs(mono[(std::size_t)onset])>level) --onset;
-  // Find first significant short RMS window before this candidate.
-  for(Sample s=lower;s<=f.at;s+=32) {double e=0;for(Sample j=s;j<std::min(count,s+64);++j)e+=double(mono[(std::size_t)j])*mono[(std::size_t)j];if(std::sqrt(e/64)>std::max(peak*.025,f.energy*.15)){onset=s;break;}}
+  // Locate a sustained energy onset using a short RMS envelope. A single
+  // zero crossing is not an onset; refine the threshold crossing sample-by-sample.
+
+  const Sample lower=std::max<Sample>(0,onset-n),upper=std::min<Sample>(count-1,f.at+n);
+  const Sample window=std::max<Sample>(8,(Sample)std::llround(audio.sampleRate*.001));
+  double sum=0;for(Sample j=lower;j<std::min(count,lower+window);++j)sum+=double(mono[(std::size_t)j])*mono[(std::size_t)j];
+  const double gate=std::max(peak*.018,f.energy*.12);bool found=false;
+  for(Sample at=lower;at<=upper;++at){if(std::sqrt(std::max(0.,sum)/window)>=gate){onset=at;found=true;break;}sum-=double(mono[(std::size_t)at])*mono[(std::size_t)at];if(at+window<count)sum+=double(mono[(std::size_t)(at+window)])*mono[(std::size_t)(at+window)];}
+  if(found){const double amplitudeGate=std::max(peak*.008,f.energy*.025);auto stop=std::min(count,onset+window);while(onset<stop&&std::abs(mono[(std::size_t)onset])<amplitudeGate)++onset;}
   onset=std::clamp<Sample>(onset,1,count-1);
-  const Sample minGap=(Sample)(audio.sampleRate*(settings.naturalNaat?.11:.065));
+  const Sample minGap=(Sample)(audio.sampleRate*(settings.percussion?.025:settings.naturalNaat?.11:.065));
   if(!result.empty() && onset-result.back().source<minGap) {if(f.score>result.back().confidence) result.back()={onset,onset,(float)f.score,(float)f.voice,false};continue;}
   result.push_back({onset,onset,(float)std::min(1.,f.score),(float)f.voice,false});
  }

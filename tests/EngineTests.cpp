@@ -65,7 +65,8 @@ int main(int argc,char** argv) {try {
   auto synthetic=silence;synthetic.channels[0].resize((std::size_t)(sr*3));
   for(double start:{.4,1.2,2.0})for(int i=0;i<(int)(sr*.35);++i){auto at=(int)(start*sr)+i;float env=float(std::min(1.,i/(sr*.008))*std::min(1.,(sr*.35-i)/(sr*.04)));synthetic.channels[0][at]=.5f*env*float(std::sin(2*std::numbers::pi*180*i/sr));}
   auto detected=detect(synthetic,s);std::cout<<"rate="<<sr<<" attacks="<<detected.size()<<" pitch="<<freq<<" Hz\n";
-  for(double expected:{.4,1.2,2.0}){bool found=false;for(auto m:detected)found|=std::abs(m.source/sr-expected)<.055;require(found,"Synthetic syllable onset within 55 ms");}
+  for(double expected:{.4,1.2,2.0}){bool found=false;for(auto m:detected)found|=std::abs(m.source/sr-expected)<.020;require(found,"Synthetic syllable onset within 20 ms");}
+  Settings percussion;percussion.percussion=true;auto transients=silence;transients.channels[0].resize((std::size_t)(sr*2));std::vector<Sample> expectedClicks{(Sample)std::llround(sr*.3),(Sample)std::llround(sr*.8),(Sample)std::llround(sr*1.4)};for(auto at:expectedClicks)for(int j=0;j<100;++j)transients.channels[0][(std::size_t)(at+j)]=.8f*(float)std::exp(-j/20.);auto percussive=detect(transients,percussion);for(auto at:expectedClicks){bool found=false;for(const auto& m:percussive)found|=std::abs(m.source-at)<=1;require(found,"Isolated percussion onset within one sample");}
   auto aligned=quantize(detected,synthetic.length(),0,Timeline(sr),s);auto vocal=render(synthetic,aligned,s);
   for(const auto& m:aligned){auto begin=std::max<Sample>(0,m.target-(Sample)(sr*.04));auto end=std::min<Sample>(vocal.length(),m.target+(Sample)(sr*.07));double energy=0;for(auto i=begin;i<end;++i)energy+=double(vocal.channels[0][(std::size_t)i])*vocal.channels[0][(std::size_t)i];require(energy>1,"Energy at corrected attack");}
   // Optional raw fixture for independent listening/plots, never a platform plugin.

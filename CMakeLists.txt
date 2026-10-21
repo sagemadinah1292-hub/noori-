@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(NooriTurabTempo VERSION 0.2.0 LANGUAGES C CXX)
+project(NooriTurabTempo VERSION 0.3.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 option(NOORI_BUILD_PLUGIN "Build the Windows VST3 (other systems: compile-check only)" ON)
@@ -45,9 +45,9 @@ if(NOORI_BUILD_PLUGIN)
   IS_SYNTH FALSE NEEDS_MIDI_INPUT FALSE NEEDS_MIDI_OUTPUT FALSE
   EDITOR_WANTS_KEYBOARD_FOCUS TRUE
   COPY_PLUGIN_AFTER_BUILD FALSE IS_ARA_EFFECT ${NOORI_ENABLE_ARA}
-  ARA_FACTORY_ID "\"audio.nooriturab.tempo.factory.0.2.0\""
-  ARA_DOCUMENT_ARCHIVE_ID "\"audio.nooriturab.tempo.archive.3\""
-  ARA_COMPATIBLE_ARCHIVE_IDS "\"audio.nooriturab.tempo.archive.1\\naudio.nooriturab.tempo.archive.2\""
+  ARA_FACTORY_ID "\"audio.nooriturab.tempo.factory.0.3.0\""
+  ARA_DOCUMENT_ARCHIVE_ID "\"audio.nooriturab.tempo.archive.4\""
+  ARA_COMPATIBLE_ARCHIVE_IDS "\"audio.nooriturab.tempo.archive.1\\naudio.nooriturab.tempo.archive.2\\naudio.nooriturab.tempo.archive.3\""
   VST3_CATEGORIES Fx Tools)
  target_compile_options(NooriTurabTempo PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
  target_sources(NooriTurabTempo PRIVATE Source/PluginProcessor.cpp Source/PluginEditor.cpp Source/ARAIntegration.cpp)

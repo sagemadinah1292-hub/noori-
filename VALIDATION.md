@@ -1,9 +1,9 @@
-# Validation status — development build 0.2.0
+# Validation status — development build 0.3.0
 
 This is not production acceptance. No claim of a delivered Windows binary, Cubase compatibility, or verified ARA integration is made by a source checkout.
 
 ## Automated DSP tests run in the Linux development environment
-PASS at 44.1 and 48 kHz: sample/quarter conversion and tempo changes; 80 BPM eighth-note snapping; zero strength; straight/triplet/dotted modes; exact identity render; fixed output duration; stationary 220 Hz tone remaining within 2 Hz; coherent identical-channel stereo output; finite output and non-identity correction; marker serialization; manual movement safety; silence rejection; three synthetic syllable-like energy attacks detected within 55 ms; energy around corrected attacks; malformed tempo-map rejection.
+PASS at 44.1 and 48 kHz: sample/quarter conversion and tempo changes; 80 BPM eighth-note snapping; zero strength; straight/triplet/dotted modes; exact identity render; fixed output duration; stationary 220 Hz tone remaining within 2 Hz; coherent identical-channel stereo output; finite output and non-identity correction; marker serialization; manual movement safety; silence rejection; three synthetic syllable-like energy attacks detected within 20 ms; energy around corrected attacks; malformed tempo-map rejection.
 
 The synthetic fixture is a harmonic tone with amplitude envelopes, not recorded Urdu. The frequency test uses zero crossings over a stationary tone, not a vocal pitch benchmark. Stereo difference tolerance is -30 dB relative energy; measured identical-channel difference is much smaller. Sample-by-sample finite checks are counted internally but do not represent independent test scenarios.
 
@@ -38,3 +38,6 @@ Retest in Cubase: import vocal and rendered click with their correct cursor orig
 The in-process official ARA SDK test host creates real named project tracks, sources, modifications and trimmed playback regions. The real editor dropdowns must enumerate an unselected metronome track, quantize the chosen target track without marker selection, match rendered transients at mapped sample coordinates and preserve attacks outside the event trim. Separate tests cover reference sample-rate conversion, duplicate-region merging, reanchoring, Select All/range selection and activation of Align selected attacks. Exact BPM tests require on-grid integer targets or explicit rejection, including tempo changes.
 
 Retest natively: assign the extension to both vocal and rendered click events, verify both named tracks appear, choose the reference dropdown and quantize the edit track. Repeat for an ordinary insert and confirm it explains unavailable project access. Check real recorded Urdu attack locations against manually annotated consonant onsets; mathematical target accuracy does not validate automatic vocal onset detection. See docs/FEATURE-CHECK.md.
+
+## 0.3.0 gates
+Complete-state history regression checks cover settings, appearance, zoom, references, anchoring, manual attack add/remove, import undo/redo, failed-import rollback, slider coalescing, redo branching and multi-session grouping. The synthetic voiced onset fixture now requires 20 ms rather than 55 ms error; isolated percussive bursts require one-sample onset placement at 44.1/48 kHz. These are synthetic fixtures, not measured Urdu performance. Both light/dark editor screenshots are generated and checked. Native Cubase and listening acceptance remain manual.

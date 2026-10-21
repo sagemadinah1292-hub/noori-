@@ -53,7 +53,7 @@ inline void projectHostTests(const ARA::ARAFactory* factory,const juce::File& ou
   juce::TextButton* quantize=nullptr;for(int i=0;i<editor->getNumChildComponents();++i)if(auto* b=dynamic_cast<juce::TextButton*>(editor->getChildComponent(i)))if(b->getButtonText()=="Quantize selected track")quantize=b;
   check(quantize&&quantize->isEnabled(),"Selected project track action active without selecting markers");quantize->onClick();waitSession(lead);check(lead->attacks[0].target==14400&&lead->attacks[1].target==38400&&lead->attacks[2].target==76800,"Track quantization matches reference and preserves attacks outside trimmed event");
   check(std::abs(lead->snapshot()->channels[0][14400]-.8f)<1e-7,"ARA project-reference transient rendered at exact project-mapped sample");
-  juce::Thread::sleep(60);juce::Timer::callPendingTimersSynchronously();
+  lead->overlay=true;dynamic_cast<NooriEditor*>(editor.get())->refresh();
   output.createDirectory();juce::Image image(juce::Image::ARGB,editor->getWidth(),editor->getHeight(),true,juce::SoftwareImageType{});juce::Graphics graphics(image);editor->paintEntireComponent(graphics,true);juce::PNGImageFormat png;auto stream=output.getChildFile("ProjectPreview.png").createOutputStream();if(stream){stream->setPosition(0);stream->truncate();}check(stream&&png.writeImageToStream(image,*stream),"ARA project editor preview");
   p.releaseResources();
  }

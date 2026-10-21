@@ -1,9 +1,9 @@
 # NOORI TURAB TEMPO
 **Preserve the Emotion. Perfect the Timing.**
 
-Experimental C++20/JUCE Windows x64 VST3 vocal attack editor, intended for Cubase Pro 15. Version 0.2.0 is a development build, not a validated production release. See [VALIDATION.md](VALIDATION.md) before using it in a session. A source archive is not a Windows installation package.
+Experimental C++20/JUCE Windows x64 VST3 vocal attack editor, intended for Cubase Pro 15. Version 0.3.0 is a development build, not a validated production release. See [VALIDATION.md](VALIDATION.md) before using it in a session. A source archive is not a Windows installation package.
 
-## 0.2.0: project tracks and exact tempo
+## 0.3.0: complete edit history, themes and timing review
 Use **Audio Extension / ARA**, not an ordinary track insert, for project-track dropdowns. Assign this extension to the vocal and to the reference track's audio events. A built-in Cubase metronome or MIDI track has no audio source for the plugin to read: render it to an audio track first. The dropdown can list only tracks/events Cubase exposes to this plugin's ARA document. Native Cubase factory discovery and access still require verification on the user's machine.
 
 Choose the **Edit** track at the top left and the reference project track in the right dropdown. Choose **Reference: metronome clicks** or **Reference: vocal attacks**. Event placement, source trims and differing source sample rates are accounted for. **Quantize selected track** is active when its source audio is loaded and does not require marker selection; it processes independent event sessions on that track. Use the Preview event dropdown to review each event. Shared modifications at different placements/crops are rejected with instructions to make independent copies.
@@ -32,7 +32,7 @@ Pitch tab is disabled because pitch editing is not implemented. Level tab displa
 2. Press **Capture**, play the vocal through the insert, then **Finish capture**. Capture stops adding data on a seek/loop, at 120 seconds, or on tempo capacity exhaustion. It never pretends to read arbitrary DAW events.
 3. Alternatively place the transport at the source event's start and **Import vocal** (WAV/AIFF/FLAC). File sample rate must match the project. File import anchors to the current transport and current BPM; it cannot query an entire Cubase tempo track. Use capture for changing tempos.
 4. Press **Detect attacks** to inspect markers or **Quantize selected track** to analyse and render in one step. Drag markers; shift-click adds selections. **Align selected attacks** renders selected adjustments. Original and corrected audio and attacks stay visible in separate labelled lanes. Only corrected markers can be dragged.
-5. **Align**, **Undo**, and **Redo** enable **Audition with Cubase transport** automatically. Play the same region. This replaces the insert output with the cached correction during playback, aligned to project samples. Outside the loaded region it outputs silence while audition is enabled. Disable audition to pass the track through. **Listen original** switches only the audition buffer; both visual lanes remain visible. Undo/redo switches listening back to the result. Buttons and Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y operate the plugin history when its editor has keyboard focus. Cubase may intercept shortcuts, so the buttons remain available.
+5. **Align** enables **Audition with Cubase transport** automatically. Undo/redo restores the listening state captured with each action. Play the same region. This replaces the insert output with the cached correction during playback, aligned to project samples. Outside the loaded region it outputs silence while audition is enabled. Disable audition to pass the track through. **Listen original** switches only the audition buffer; both visual lanes remain visible. Undo/redo also restores original/result comparison. Buttons and Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y operate the plugin history when its editor has keyboard focus. Cubase may intercept shortcuts, so the buttons remain available.
 6. **Export WAV** writes a 24-bit corrected file. Keep the source and review pronunciation, breaths, vowels and artefacts by ear. Save the Cubase project to persist input and edits.
 
 ## Timing and metronome reference (0.1.1)
@@ -78,8 +78,10 @@ This compiles a test executable and DSP library, not a Linux plugin or a product
 - Analysis/rendering are offline workers. File dialogs and WAV export/state serialization are non-realtime operations. Starting and finishing insert capture temporarily suspend processing; imported/rendered buffers are swapped only after a completed job.
 - Capture derives piecewise constant tempos from block metadata; it cannot recover tempo changes within a host block. ARA tempo entries are converted to piecewise sample/quarter segments; continuous tempo ramps between entries are not modelled. Time signatures are displayed from transport; note divisions use quarter-note PPQ independently of metre.
 - Sample Accurate off rounds movement to approximately 1 ms; on uses integer sample positions. Humanize is repeatable and constrained. Strength zero is an identity warp. Natural-mode warp limits can prevent a marker reaching the requested grid line; exact mode rejects an unsafe/colliding target set. No crossing is allowed.
-- Changes during a worker job are disabled. Saving during a job saves the last committed revision, not an unfinished render. Undo history is session-local; reopening restores the committed correction, not the undo stack.
+- Changes during a worker job are disabled. Saving during a job saves the last committed revision, not an unfinished render. Undo history is shared across edit sessions visited by this plugin instance; reopening restores the committed correction, not the undo stack.
 - This is unsigned development software. VST3 SDK validator/pluginval and Cubase host validation are not replaced by the internal smoke test.
 
 ## License
 Original source is GPL-3.0-only (LICENSE), using JUCE under its GPLv3 option. Commercial redistribution under other terms needs the appropriate JUCE agreement and rights to this source. Signalsmith Stretch/Linear are MIT; ARA API/library are Apache-2.0; bundled VST3 notices are retained in `licenses/`. No rights to RePitch or Steinberg/Celemony trademarks are granted. See [licenses/THIRD-PARTY.md](licenses/THIRD-PARTY.md).
+
+See [0.3.0 changes and undo scope](docs/UPDATE-0.3.md) for light/dark themes, reference waveform overlay, manual attack editing and expanded history.
