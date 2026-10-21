@@ -1,0 +1,40 @@
+name: Windows x64 VST3
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+concurrency:
+  group: windows-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  release:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure Visual Studio 2022 x64 with official ARA SDK
+        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DNOORI_ENABLE_ARA=ON -DBUILD_TESTING=ON
+      - name: Phase 1 — compile VST3 processor and GUI
+        run: cmake --build build --config Release --target NooriTurabTempo_VST3 --parallel 2
+      - name: Phases 2–5 — compile DSP and processor tests
+        run: cmake --build build --config Release --target noori_tests noori_plugin_smoke --parallel 2
+      - name: Run automated audio and processor checks
+        run: ctest --test-dir build -C Release --output-on-failure
+      - name: Verify Windows x64 bundle and package
+        shell: pwsh
+        run: ./scripts/Package.ps1
+      - name: Upload actual Windows package
+        uses: actions/upload-artifact@v4
+        with:
+          name: Noori-Turab-Tempo-Windows-x64
+          path: dist/Noori-Turab-Tempo-Windows-x64.zip
+          if-no-files-found: error
+      - name: Upload validation logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-logs
+          path: build/Testing/Temporary/
+          if-no-files-found: ignore
