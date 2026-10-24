@@ -43,6 +43,11 @@ int main(int argc,char** argv) {try {
   require(impossible,"Impossible exact reference match rejected without partial success");
   auto strict=quantize(markers,a.length(),0,Timeline(sr),defaults,false,{},true);
   require(strict[0].target==(Sample)std::llround(sr*.75),"Exact BPM never projects between grid lines");
+  auto inherited=defaults;inherited.strength=.25;inherited.swing=.4;inherited.offsetMs=21;inherited.humanizeMs=9;inherited.toleranceMs=100;inherited.sampleAccurate=false;inherited.emotionalProtection=true;
+  require(quantize(markers,a.length(),0,Timeline(sr),inherited,false,{},true)[0].target==strict[0].target,"Exact BPM ignores inherited natural timing controls");
+  require(quantize(markers,a.length(),0,Timeline(sr),inherited,false,clicks)[0].target==clicks[0],"Exact reference ignores inherited natural timing controls");
+  bool unordered=false;try{quantize(markers,a.length(),0,Timeline(sr),defaults,false,{clicks[1],clicks[0]});}catch(const std::invalid_argument&){unordered=true;}
+  require(unordered,"Unordered reference rejected rather than silently missing nearest attack");
   bool strictRejected=false;try{Attacks tooFar{{(Sample)std::llround(sr*.2),(Sample)std::llround(sr*.2),1,1,true}};quantize(tooFar,a.length(),0,Timeline(sr),defaults,false,{},true);}catch(...){strictRejected=true;}
   require(strictRejected,"Unsafe exact BPM request rejected instead of partial off-grid warp");
   Attacks afterTempo{{(Sample)std::llround(sr*3.52),(Sample)std::llround(sr*3.52),1,1,true}};
