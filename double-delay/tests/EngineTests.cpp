@@ -1,0 +1,24 @@
+#include "DelayEngine.h"
+#include <iostream>
+#include <stdexcept>
+#include <random>
+using namespace noori_delay;
+static int checks=0;static void require(bool value,const char* label){++checks;if(!value)throw std::runtime_error(label);}static bool near(float a,float b){return std::abs(a-b)<2e-5f;}
+int main(){try{
+ Tap t;t.sync=true;t.note=3;t.rhythm=2;t.multiplier=2;require(std::abs(seconds(t,120)-.75)<1e-12,"Screenshot first delay: dotted eighth x2");t.note=2;t.rhythm=0;t.multiplier=3;require(std::abs(seconds(t,120)-1.5)<1e-12,"Screenshot second delay: quarter x3");
+ for(int note=0;note<6;++note)for(int rhythm=0;rhythm<3;++rhythm)for(int mult=1;mult<=10;++mult){t.note=note;t.rhythm=rhythm;t.multiplier=mult;double expected=4./(1<<note)*(rhythm==1?2./3:rhythm==2?1.5:1)*mult*60./137;require(std::abs(seconds(t,137)-expected)<1e-12,"All synced note/rhythm/multiplier combinations");}
+ for(double rate:{44100.,48000.,96000.,192000.}){
+  Engine e;e.prepare(rate);require(e.allocatedBytes()<std::size_t(rate*81),"Bounded delay memory");Settings s;s.mix=1;s.feedback=.5;s.taps[0].milliseconds=100;s.taps[1].milliseconds=150;int n=int(rate*.61);std::vector<float> l(n),r(n);l[0]=r[0]=1;e.process(l.data(),r.data(),n,s);
+  require(near(l[std::size_t(std::lround(rate*.1))],1),"First left echo timing and gain");require(near(r[std::size_t(std::lround(rate*.15))],1),"First right echo timing and gain");require(near(l[std::size_t(std::lround(rate*.2))],.5f),"Left feedback repeat gain");require(near(r[std::size_t(std::lround(rate*.3))],.5f),"Right feedback repeat gain");require(near(l[0],0)&&near(r[0],0),"100 percent wet excludes dry");require(near(l[std::size_t(std::lround(rate*.15))],0),"Independent lines do not cross-feed");
+  e.reset();s.mix=0;std::mt19937 gen(7);std::uniform_real_distribution<float> dist(-.8f,.8f);for(int i=0;i<n;++i){l[(std::size_t)i]=dist(gen);r[(std::size_t)i]=dist(gen);}auto beforeL=l,beforeR=r;e.process(l.data(),r.data(),n,s);require(l==beforeL&&r==beforeR,"Mix zero is bit-identical dry stereo");
+  e.reset();std::fill(l.begin(),l.end(),0);std::fill(r.begin(),r.end(),0);e.process(l.data(),r.data(),n,s);for(int i=0;i<n;++i)require(l[(std::size_t)i]==0&&r[(std::size_t)i]==0,"Reset clears delay tails");
+  e.reset();s.mix=1;s.feedback=0;s.taps[1].milliseconds=100;s.taps[0].pan=s.taps[1].pan=0;l.assign(n,0);r.assign(n,0);l[0]=1;e.process(l.data(),r.data(),n,s);require(near(l[std::size_t(std::lround(rate*.1))],.5f)&&near(r[std::size_t(std::lround(rate*.1))],.5f),"Stereo sum and linear centre pan");
+  e.reset();s.taps[0].sync=s.taps[1].sync=true;s.taps[0].note=3;s.taps[1].note=2;s.taps[0].rhythm=2;s.taps[0].multiplier=2;s.taps[1].multiplier=3;s.bpm=120;l.assign(int(rate*1.6),0);r=l;l[0]=r[0]=1;e.process(l.data(),r.data(),int(l.size()),s);require(near(l[std::size_t(std::lround(rate*.75))],.5f)&&near(r[std::size_t(std::lround(rate*1.5))],.5f),"Synced screenshot settings render exact echo centres");
+ }
+ Settings s;s.mix=1;s.feedback=.7;s.taps[0].milliseconds=13.125;s.taps[1].milliseconds=17.75;Engine a,b;a.prepare(48000);b.prepare(48000);std::vector<float> l(48000),r(48000);for(std::size_t i=0;i<l.size();++i){l[i]=std::sin(float(i)*.07f)*.2f;r[i]=std::cos(float(i)*.11f)*.2f;}auto sl=l,sr=r;a.process(l.data(),r.data(),int(l.size()),s);for(int offset=0;offset<48000;){int n=std::min(127,48000-offset);b.process(sl.data()+offset,sr.data()+offset,n,s);offset+=n;}require(l==sl&&r==sr,"Static processing independent of host block size");
+ s.taps[0].milliseconds=500;s.taps[1].milliseconds=200;for(int i=0;i<200;++i){std::array<float,64> left{},right{};left[0]=right[0]=.1f;s.feedback=1;s.taps[0].milliseconds=i%2?1:9999;a.process(left.data(),right.data(),64,s);for(int j=0;j<64;++j)require(std::isfinite(left[(std::size_t)j])&&std::isfinite(right[(std::size_t)j]),"Rapid delay automation remains finite");}
+ Engine wrap;wrap.prepare(48000);Settings longDelay;longDelay.mix=1;longDelay.feedback=.5;longDelay.taps[0].milliseconds=longDelay.taps[1].milliseconds=9999;std::vector<float> wl(1000000),wr(1000000);wl[0]=wr[0]=1;wrap.process(wl.data(),wr.data(),int(wl.size()),longDelay);require(near(wl[479952],1)&&near(wr[959904],.5f),"Maximum manual delay and feedback across ring-buffer wrap");
+ Engine fractional;fractional.prepare(48000);Settings fs;fs.mix=1;fs.feedback=0;fs.taps[0].milliseconds=fs.taps[1].milliseconds=2.5/48.;std::array<float,16> fl{},fr{};fl[0]=fr[0]=1;fractional.process(fl.data(),fr.data(),16,fs);require(near(fl[2],.5f)&&near(fl[3],.5f),"Fractional-sample delay interpolation");
+ Engine mono;mono.prepare(48000);s=Settings{};s.mix=0;std::array<float,256> signal{};signal[0]=.7f;mono.process(signal.data(),nullptr,256,s);require(signal[0]==.7f,"Mono dry path");
+ std::cout<<"PASS "<<checks<<" delay engine checks\n";return 0;
+ }catch(const std::exception& e){std::cerr<<"FAIL "<<e.what()<<'\n';return 1;}}

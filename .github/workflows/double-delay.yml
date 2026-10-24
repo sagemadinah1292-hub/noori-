@@ -1,0 +1,45 @@
+name: Double Delay Windows x64
+on:
+  push:
+    branches: ['codex/double-delay']
+  pull_request:
+    paths: ['double-delay/**', '.github/workflows/double-delay.yml']
+  workflow_dispatch:
+concurrency:
+  group: double-delay-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure Windows x64
+        run: cmake -S double-delay -B build-delay -G "Visual Studio 17 2022" -A x64
+      - name: Compile VST3 and tests
+        run: cmake --build build-delay --config Release --parallel 2
+      - name: Test echo timing, processor and editor
+        run: ctest --test-dir build-delay -C Release --output-on-failure
+      - name: Verify and package
+        shell: pwsh
+        run: ./double-delay/scripts/Package.ps1
+      - name: Upload installable Windows package
+        uses: actions/upload-artifact@v4
+        with:
+          name: Noori-Double-Delay-Windows-x64
+          path: dist-delay/Noori-Double-Delay-Windows-x64.zip
+          if-no-files-found: error
+      - name: Upload preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: Double-Delay-Preview
+          path: build-delay/Preview.png
+      - name: Upload test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Double-Delay-Test-Logs
+          path: build-delay/Testing/Temporary/
+          if-no-files-found: ignore
