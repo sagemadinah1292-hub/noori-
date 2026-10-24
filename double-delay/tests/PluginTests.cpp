@@ -1,0 +1,16 @@
+#include "Plugin.h"
+#include <fstream>
+#include <iostream>
+static void check(bool b,const char* label){if(!b)throw std::runtime_error(label);}
+class Head final:public juce::AudioPlayHead {public:double bpm=120;juce::Optional<PositionInfo> getPosition()const override{PositionInfo p;p.setBpm(bpm);p.setIsPlaying(true);return p;}};
+int main(int argc,char** argv){try{
+ juce::ScopedJuceInitialiser_GUI init;DelayProcessor p;Head head;p.setPlayHead(&head);p.setRateAndBufferSizeDetails(48000,256);p.prepareToPlay(48000,256);p.preset(2);p.setValue("mix",100);p.setValue("feedback",0);
+ auto s=p.settings();check(s.taps[0].sync&&s.taps[0].multiplier==2&&s.taps[0].rhythm==2&&s.taps[1].multiplier==3,"Screenshot preset parameters");
+ juce::MidiBuffer midi;juce::AudioBuffer<float> b(2,256);std::vector<float> l,r;for(int n=0;n<76000;n+=256){b.clear();if(n==0){b.setSample(0,0,1);b.setSample(1,0,1);}p.processBlock(b,midi);l.insert(l.end(),b.getReadPointer(0),b.getReadPointer(0)+256);r.insert(r.end(),b.getReadPointer(1),b.getReadPointer(1)+256);}check(std::abs(l[36000]-1)<1e-5&&std::abs(r[72000]-1)<1e-5,"Processor passes host tempo and synced delays to DSP");check(p.tempoAvailable&&p.displayedBpm==120,"Host BPM observed");
+ juce::MemoryBlock state;p.getStateInformation(state);DelayProcessor restored;restored.setStateInformation(state.getData(),(int)state.getSize());check(restored.settings().taps[0].multiplier==2&&restored.settings().taps[0].sync&&restored.settings().mix==1,"State restoration");
+ head.bpm=80;b.clear();p.processBlock(b,midi);check(p.displayedBpm==80,"Host tempo changes tracked");p.setPlayHead(nullptr);p.setValue("manualBpm",95);p.processBlock(b,midi);check(!p.tempoAvailable&&p.settings().bpm==95,"Manual BPM used without host timing");
+ p.setValue("sync1",1);p.setValue("note1",0);p.setValue("mult1",10);p.setValue("manualBpm",30);p.processBlock(b,midi);check(p.limited,"Overlong synced times disclosed");
+ p.preset(2);p.setPlayHead(&head);head.bpm=120;p.processBlock(b,midi);std::unique_ptr<juce::AudioProcessorEditor> editor(p.createEditor());check(editor&&editor->getWidth()==820,"Editor constructed");
+ auto output=argc>1?juce::File(argv[1]):juce::File::getCurrentWorkingDirectory();output.createDirectory();juce::Image preview(juce::Image::ARGB,editor->getWidth(),editor->getHeight(),true);juce::Graphics g(preview);editor->paintEntireComponent(g,true);juce::PNGImageFormat png;auto file=output.getChildFile("Preview.png").createOutputStream();check(file&&png.writeImageToStream(preview,*file),"Real editor preview generated");file.reset();
+ bool found=false;for(int i=0;i<editor->getNumChildComponents();++i)if(auto* button=dynamic_cast<juce::TextButton*>(editor->getChildComponent(i)))if(button->getButtonText()=="Clear echoes"){button->onClick();found=true;}check(found&&p.clearRequested,"Clear echoes action");p.releaseResources();output.getChildFile("delay-tests.ok").replaceWithText("Windows processor/editor, host tempo, synced impulse, save/restore, manual BPM and GUI checks passed. Cubase and original DLL sound comparison not run.\n");std::cout<<"PASS delay processor and editor\n";return 0;
+ }catch(const std::exception& e){std::cerr<<"FAIL "<<e.what()<<'\n';return 1;}}
