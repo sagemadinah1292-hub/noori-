@@ -61,7 +61,7 @@ public:
  std::shared_ptr<const noori::Audio> snapshot()const;
  void selectAll(bool selected=true);void selectRange(noori::Sample,noori::Sample,bool additive=false,bool sourceCoordinates=false);
  void anchorTo(noori::Sample);
- void loadReference(const juce::File&,noori::Sample projectStart);
+ void loadReference(const juce::File&,noori::Sample projectStart,bool clickTrack=true);
  std::atomic<const noori::Audio*> audible{nullptr},originalAudible{nullptr};
  std::atomic<noori::Sample> realtimeOrigin{0};
  std::atomic<bool> compare{false}, busy{false};

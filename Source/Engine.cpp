@@ -146,7 +146,11 @@ static Attacks constrain(Attacks a,Sample length,double limit) {
  }
  validateMarkers(a,length,limit);return a;
 }
-Attacks quantize(const Attacks& attacks,Sample length,Sample origin,const Timeline& timeline,const Settings& s,bool selectedOnly,const std::vector<Sample>& reference,bool exactBpm) {
+Attacks quantize(const Attacks& attacks,Sample length,Sample origin,const Timeline& timeline,const Settings& requested,bool selectedOnly,const std::vector<Sample>& reference,bool exactBpm) {
+ auto s=requested;
+ // Exact modes must be exact even for callers outside the editor.
+ if(exactBpm||!reference.empty()){s.strength=1;s.swing=0;s.offsetMs=0;s.humanizeMs=0;s.toleranceMs=0;s.sampleAccurate=true;s.emotionalProtection=false;}
+ if(!std::is_sorted(reference.begin(),reference.end()))throw std::invalid_argument("Reference attacks must be ordered");
  if(s.division!=4&&s.division!=8&&s.division!=16&&s.division!=32)throw std::invalid_argument("Unsupported grid");
  if(!std::isfinite(s.strength)||!std::isfinite(s.swing)||!std::isfinite(s.offsetMs)||!std::isfinite(s.humanizeMs)||!std::isfinite(s.toleranceMs))throw std::invalid_argument("Invalid quantization settings");
  double step=4./s.division;
