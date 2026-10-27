@@ -25,7 +25,7 @@ private:
   std::vector<Envelope> envelopes;
   int referenceBottom()const{return 30+(getHeight()-30)/3;}
   int originalBottom()const{return 30+2*(getHeight()-30)/3;}
-  NooriEditor& editor;bool overview;int dragging=-1;noori::Sample dragTarget=0;bool rangeSelecting=false,additiveRange=false,sourceRange=false;float rangeStart=0,rangeEnd=0;
+  NooriEditor& editor;bool overview;int dragging=-1;noori::Sample dragTarget=0;bool transportClick=false;bool rangeSelecting=false,additiveRange=false,sourceRange=false;float rangeStart=0,rangeEnd=0;
   noori::Sample sampleAt(float)const;float xAt(noori::Sample)const;
  };
  NooriProcessor& processor;std::shared_ptr<EditSession> session;
@@ -40,6 +40,8 @@ private:
  juce::TextButton undoButton{"Undo"},redoButton{"Redo"},compareButton{"Listen original"},settingsButton{"Settings"};
  juce::TextButton attackTab{"Attack"},pitchTab{"Pitch"},levelTab{"Level"},selectedButton{"Align selected attacks"},alignButton{"Quantize selected track"};
  juce::ToggleButton sampleAccurate{"Sample accurate"},breath{"Breath protection"},consonant{"Consonant protection"},vowel{"Long vowel protection"},emotion{"Emotional phrase protection"},audition{"Audition with Cubase transport"};
+ juce::TextButton playFromClick{"Click to play"},stopPlayback{"Stop"},printOptions{"Print options"};
+ void playAt(noori::Sample);
  juce::TextButton themeButton{"Dark theme"},overlayButton{"Overlay reference"},addButton{"Add attack"},removeButton{"Remove selected"};
  juce::TextButton referenceButton{"Import reference"},selectAllButton{"Select all attacks"},clearSelectionButton{"Clear selection"},anchorButton{"Audio start = cursor"};
  juce::ComboBox targetTrack,targetEvent,referenceTrack,referenceAnalysis,referenceStart;
