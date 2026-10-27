@@ -24,4 +24,4 @@ The fixed 40 ms nominal latency is reported to the host for delay compensation; 
 ## Validation and license
 Automated engine tests check delayed dry impulses, bounded stereo output, silence/reset, mono routing, sample-rate coverage, block-size invariance, and finite tails. Windows tests also check processor state, routing, presets and real editor rendering. Cubase listening and host acceptance are pending.
 
-GPL-3.0; see LICENSE and bundled dependency notices. Build source is supplied in this repository under `voice-choir/`. No user audio is included.
+AGPL-3.0; see LICENSE and bundled dependency notices. Complete corresponding source and build scripts: https://github.com/sagemadinah1292-hub/noori-/tree/codex/voice-choir/voice-choir . Pin the commit in BUILD-INFO.json to obtain the exact version. No user audio is included.
