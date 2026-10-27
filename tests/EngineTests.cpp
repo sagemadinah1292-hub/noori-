@@ -57,6 +57,9 @@ int main(int argc,char** argv) {try {
   require(safeGroup.attacks[0].target==groupClicks[0]&&safeGroup.attacks[1].target==groupClicks[1]&&safeGroup.attacks[2].target==group[2].target,"Automatic cropped event preserves unselected attacks");
   bool noMatch=false;try{autoQuantize(clustered,a.length(),0,Timeline(sr),defaults,false,{(Sample)std::llround(sr*3.9)});}catch(...){noMatch=true;}
   require(noMatch,"No feasible automatic anchors is explicit failure, not false success");
+  auto gentleSettings=defaults;gentleSettings.maxStretch=1.10;auto gentle=autoQuantize(clustered,a.length(),0,Timeline(sr),gentleSettings,false,{(Sample)std::llround(sr*.75)});
+  require(gentle.matched>=1&&gentle.attacks[0].target==(Sample)std::llround(sr*.75),"Gentle vocal mode keeps feasible anchors exactly on reference");
+  Sample lastSource=0,lastTarget=0;for(std::size_t i=0;i<=gentle.attacks.size();++i){auto source=i<gentle.attacks.size()?gentle.attacks[i].source:a.length(),target=i<gentle.attacks.size()?gentle.attacks[i].target:a.length();double ratio=double(target-lastTarget)/(source-lastSource);require(ratio>=1/1.10-1e-7&&ratio<=1.10+1e-7,"Gentle vocal mode bounds every local duration change");lastSource=source;lastTarget=target;}
   bool strictRejected=false;try{Attacks tooFar{{(Sample)std::llround(sr*.2),(Sample)std::llround(sr*.2),1,1,true}};quantize(tooFar,a.length(),0,Timeline(sr),defaults,false,{},true);}catch(...){strictRejected=true;}
   require(strictRejected,"Unsafe exact BPM request rejected instead of partial off-grid warp");
   Attacks afterTempo{{(Sample)std::llround(sr*3.52),(Sample)std::llround(sr*3.52),1,1,true}};
