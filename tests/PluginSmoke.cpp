@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "DefaultLogo.h"
 #include <iostream>
 #include <stdexcept>
 #include <numbers>
@@ -14,7 +15,7 @@ static void waitSession(const std::shared_ptr<EditSession>& s,bool success=true)
 #include "ProjectHostTests.h"
 #include "HistoryTests.h"
 int main(int argc,char** argv){installTestCrashDiagnostics();try{
- juce::ScopedJuceInitialiser_GUI gui;historyTests();
+ juce::ScopedJuceInitialiser_GUI gui;auto builtInLogo=juce::Drawable::createFromImageData(defaultLogoSVG,sizeof(defaultLogoSVG)-1);check(builtInLogo&&!builtInLogo->getDrawableBounds().isEmpty(),"Provided SVG logo loads as vector artwork");historyTests();
 #if JucePlugin_Enable_ARA
  const auto* factory=createARAFactory();check(factory&&juce::String(factory->factoryID)=="audio.nooriturab.tempo.factory.0.3.0"&&juce::String(factory->documentArchiveID)=="audio.nooriturab.tempo.archive.4","ARA factory identifiers");
  check(factory->compatibleDocumentArchiveIDsCount==3&&juce::String(factory->compatibleDocumentArchiveIDs[0])=="audio.nooriturab.tempo.archive.1"&&juce::String(factory->compatibleDocumentArchiveIDs[1])=="audio.nooriturab.tempo.archive.2","ARA backward archive IDs");
@@ -52,6 +53,8 @@ int main(int argc,char** argv){installTestCrashDiagnostics();try{
  auto vocalReferenceSession=std::make_shared<EditSession>();vocalReferenceSession->load([audio]{return *audio;},"Vocal reference import",0,noori::Timeline());waitSession(vocalReferenceSession);
  vocalReferenceSession->loadReference(vocalReferenceFile,12000,false);waitSession(vocalReferenceSession);check(!vocalReferenceSession->referenceIsClick&&!vocalReferenceSession->referenceClicks.empty(),"Imported reference honours vocal detector selection");
  auto vocalReferenceState=vocalReferenceSession->archive(true);auto restoredVocalReference=std::make_shared<EditSession>();restoredVocalReference->restore(vocalReferenceState.getData(),vocalReferenceState.getSize(),true);waitSession(restoredVocalReference);check(!restoredVocalReference->referenceIsClick&&restoredVocalReference->referenceClicks==vocalReferenceSession->referenceClicks,"Imported vocal reference mode and attacks survive restore");vocalReferenceFile.deleteFile();
+ auto autoSession=std::make_shared<EditSession>();autoSession->load([audio]{return *audio;},"Clustered vocal",0,noori::Timeline());waitSession(autoSession);autoSession->attacks={{37440,37440,1,1,false},{38880,38880,.5f,1,false}};autoSession->referenceClicks={36000};autoSession->useReference=true;autoSession->align(false,{},true);waitSession(autoSession);check(autoSession->attacks[0].target==36000&&autoSession->status.contains("1 exact anchors"),"Automatic track action resolves duplicate click assignments");
+ auto previousAuto=autoSession->audible.load();autoSession->referenceClicks={300000};autoSession->align(false,{},true);check(!autoSession->busy&&autoSession->status.contains("does not overlap")&&autoSession->audible.load()==previousAuto,"Nonoverlapping reference explains its placement and preserves audio");
  auto priorBuffer=p.insertSession->audible.load();p.insertSession->align();waitSession(p.insertSession,false);check(p.insertSession->status.contains("Exact click match")&&p.insertSession->audible.load()==priorBuffer,p.insertSession->status.toRawUTF8());clickFile.deleteFile();
  check(p.insertSession->referenceClicks==std::vector<noori::Sample>{13000,37000},"Reference import project anchor");
  juce::MemoryBlock state;p.getStateInformation(state);auto reopenedStorage=std::make_unique<NooriProcessor>();auto& reopened=*reopenedStorage;reopened.setRateAndBufferSizeDetails(48000,512);reopened.prepareToPlay(48000,512);reopened.setStateInformation(state.getData(),(int)state.getSize());waitSession(reopened.insertSession);check(reopened.insertSession->referenceClicks==p.insertSession->referenceClicks&&reopened.insertSession->useReference,"Saved reference clicks restored");check(reopened.insertSession->attacks.size()==attacks.size(),"Saved project restored attacks");check(reopened.insertSession->original->channels==audio->channels,"Float source restored losslessly");
@@ -71,7 +74,7 @@ int main(int argc,char** argv){installTestCrashDiagnostics();try{
   clickProcessor->insertSession->load([clicks]{return *clicks;},"Captured click",96000,noori::Timeline());waitSession(clickProcessor->insertSession);
   auto vocalStorage=std::make_unique<NooriProcessor>();auto& vocal=*vocalStorage;vocal.setRateAndBufferSizeDetails(48000,512);vocal.prepareToPlay(48000,512);vocal.insertSession->load([audio]{return *audio;},"Connected vocal",0,noori::Timeline());waitSession(vocal.insertSession);vocal.insertSession->attacks={{112800,112800,1,1,false},{136800,136800,1,1,false}};
   auto connected=vocal.connectedReferenceTracks();check(std::any_of(connected.begin(),connected.end(),[](const auto& t){return t.name.startsWith("Project Metronome")&&!t.editable;}),"Host-named connected reference track enumerated");
-  std::unique_ptr<juce::AudioProcessorEditor> edit(vocal.createEditor());juce::ComboBox* references=nullptr;juce::TextButton* quantize=nullptr;for(int i=0;i<edit->getNumChildComponents();++i){auto* c=edit->getChildComponent(i);if(c->getName()=="Project reference track")references=dynamic_cast<juce::ComboBox*>(c);if(auto* b=dynamic_cast<juce::TextButton*>(c))if(b->getButtonText()=="Quantize selected track")quantize=b;}
+  std::unique_ptr<juce::AudioProcessorEditor> edit(vocal.createEditor());juce::ComboBox* references=nullptr;juce::TextButton* quantize=nullptr;for(int i=0;i<edit->getNumChildComponents();++i){auto* c=edit->getChildComponent(i);if(c->getName()=="Project reference track")references=dynamic_cast<juce::ComboBox*>(c);if(auto* b=dynamic_cast<juce::TextButton*>(c))if(b->getName()=="Quantize vocal")quantize=b;}
   check(references&&quantize,"Connected insert dropdown and track action");int choice=0;for(int i=0;i<references->getNumItems();++i)if(references->getItemText(i).startsWith("Project Metronome"))choice=references->getItemId(i);check(choice!=0,"Captured project click offered in actual dropdown");references->setSelectedId(choice,juce::sendNotificationSync);waitSession(vocal.insertSession);
   quantize->onClick();waitSession(vocal.insertSession);check(vocal.insertSession->attacks[0].target==110400&&vocal.insertSession->attacks[1].target==134400,"Connected-track project offset matched exactly");
   auto archived=vocal.insertSession->archive(true);auto saved=std::make_shared<EditSession>();saved->restore(archived.getData(),archived.getSize(),true);waitSession(saved);check(saved->referenceProjectID==vocal.insertSession->referenceProjectID&&saved->referenceIsClick,"Project reference identity saved");
@@ -79,21 +82,24 @@ int main(int argc,char** argv){installTestCrashDiagnostics();try{
  }
  {
   auto manualStorage=std::make_unique<NooriProcessor>();auto& manual=*manualStorage;manual.setRateAndBufferSizeDetails(48000,512);manual.prepareToPlay(48000,512);manual.insertSession->load([audio]{return *audio;},"Manual BPM fixture",0,noori::Timeline());waitSession(manual.insertSession);manual.insertSession->attacks={{38880,38880,1,1,false}};
-  std::unique_ptr<juce::AudioProcessorEditor> edit(manual.createEditor());juce::Slider* tempo=nullptr;juce::TextButton* quantize=nullptr;for(int i=0;i<edit->getNumChildComponents();++i){auto* c=edit->getChildComponent(i);if(auto* slider=dynamic_cast<juce::Slider*>(c))if(slider->getTextValueSuffix()==" BPM")tempo=slider;if(auto* b=dynamic_cast<juce::TextButton*>(c))if(b->getButtonText()=="Quantize selected track")quantize=b;}
+  std::unique_ptr<juce::AudioProcessorEditor> edit(manual.createEditor());juce::Slider* tempo=nullptr;juce::TextButton* quantize=nullptr;for(int i=0;i<edit->getNumChildComponents();++i){auto* c=edit->getChildComponent(i);if(auto* slider=dynamic_cast<juce::Slider*>(c))if(slider->getTextValueSuffix()==" BPM")tempo=slider;if(auto* b=dynamic_cast<juce::TextButton*>(c))if(b->getName()=="Quantize vocal")quantize=b;}
   check(tempo&&tempo->isEnabled()&&quantize,"Manual tempo fallback available without host metadata");tempo->setValue(120,juce::sendNotificationSync);quantize->onClick();waitSession(manual.insertSession);check(manual.insertSession->timeline.points()[0].bpm==120&&manual.insertSession->attacks[0].target==36000,"UI exact BPM quantization follows the selected tempo");manual.releaseResources();
  }
  // Reopen test fixture for a screenshot of the actual editor, not a design mockup.
  p.insertSession->load([audio]{return *audio;},"Synthetic test vocal | 48 kHz",0,noori::Timeline());waitSession(p.insertSession);p.insertSession->analyse();waitSession(p.insertSession);p.insertSession->align();waitSession(p.insertSession);
  p.insertSession->referenceName="Synthetic metronome reference";p.insertSession->referenceClicks={18000,36000,54000,72000,90000,108000,126000,144000,162000,180000};
- std::unique_ptr<juce::AudioProcessorEditor> editor(p.createEditor());check(editor->getWidth()>=1100,"Editor dimensions");
+ std::unique_ptr<juce::AudioProcessorEditor> editor(p.createEditor());check(editor->getWidth()>=1100,"Editor dimensions");editor->setVisible(true);
 #if JucePlugin_Enable_ARA
  check(dynamic_cast<juce::AudioProcessorEditorARAExtension*>(editor.get())!=nullptr,"ARA editor lifecycle extension");
 #endif
- auto button=[&](const juce::String& title){for(int i=0;i<editor->getNumChildComponents();++i)if(auto* b=dynamic_cast<juce::TextButton*>(editor->getChildComponent(i)))if(b->getButtonText()==title)return b;return (juce::TextButton*)nullptr;};
+ auto button=[&](const juce::String& title){for(int i=0;i<editor->getNumChildComponents();++i)if(auto* b=dynamic_cast<juce::TextButton*>(editor->getChildComponent(i)))if(b->getButtonText()==title||(title=="Quantize selected track"&&b->getName()=="Quantize vocal"))return b;return (juce::TextButton*)nullptr;};
  check(button("Undo")&&button("Redo")&&button("Import reference"),"Required editor controls visible");
  p.audition=false;p.insertSession->compare=true;auto beforeUI=p.insertSession->audible.load();button("Undo")->onClick();
  check(p.audition&&!p.insertSession->compare&&p.insertSession->audible.load()!=beforeUI,"Undo button activates edited audition");
  button("Redo")->onClick();check(p.insertSession->audible.load()==beforeUI,"Redo button restores editor result");
+ check(button("Quantize selected track")->getButtonText()=="Quantize current vocal","Current vocal action is explicitly named");
+ juce::ComboBox* referencePlacement=nullptr;juce::ComboBox* editVocal=nullptr;for(int i=0;i<editor->getNumChildComponents();++i)if(auto* c=dynamic_cast<juce::ComboBox*>(editor->getChildComponent(i))){if(c->getName()=="Reference import start")referencePlacement=c;if(c->getName()=="Project target track")editVocal=c;}
+ check(referencePlacement&&referencePlacement->getSelectedId()==1,"Reference imports default to vocal start, not moving cursor");check(editVocal&&editVocal->getText().contains(p.insertSession->name),"Current edit vocal identified in selector");
  check(button("Select all attacks")&&button("Quantize selected track"),"Track and attack selection actions are distinct");button("Select all attacks")->onClick();juce::TextButton* alignSelected=nullptr;for(int i=0;i<editor->getNumChildComponents();++i)if(auto* b=dynamic_cast<juce::TextButton*>(editor->getChildComponent(i)))if(b->getButtonText().startsWith("Align selected attacks"))alignSelected=b;check(alignSelected&&alignSelected->isEnabled(),"Select all activates Align selected attacks");alignSelected->onClick();waitSession(p.insertSession);button("Clear selection")->onClick();check(!alignSelected->isEnabled(),"Clear selection disables only attack selection action");check(button("Quantize selected track")->isEnabled(),"Track quantization stays active without marker selection");
  // Exercise actual controls, not only the session API.
  juce::ComboBox* gridControl=nullptr;juce::Slider* sensitivityControl=nullptr;for(int i=0;i<editor->getNumChildComponents();++i){auto* c=editor->getChildComponent(i);if(auto* box=dynamic_cast<juce::ComboBox*>(c))if(box->getNumItems()==4&&box->getItemText(0)=="1/4")gridControl=box;if(c->getName()=="Attack sensitivity")sensitivityControl=dynamic_cast<juce::Slider*>(c);}

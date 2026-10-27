@@ -46,11 +46,11 @@ inline void projectHostTests(const ARA::ARAFactory* factory,const juce::File& ou
   for(int i=0;i<2;++i){auto a=std::make_shared<noori::Audio>();a->sampleRate=48000;a->channels.resize(1,std::vector<float>(96000));for(auto sample:i?std::vector<int>{14400,38400,76800}:std::vector<int>{16800,40800,76800})for(int j=0;j<1200;++j)a->channels[0][(std::size_t)(sample+j)]=.8f*(float)std::exp(-j/300.)*(float)std::cos(2*std::numbers::pi*1000*j/48000.);auto s=tracks[(std::size_t)i].regions[0].session;s->load([a]{return *a;},tracks[(std::size_t)i].name,468000,noori::Timeline());waitSession(s);}
   auto lead=tracks[0].regions[0].session;lead->attacks={{16800,16800,1,1,false},{40800,40800,1,1,false},{76800,76800,1,1,false}};
   std::cerr<<"ARA regression: create editor\n";
-  std::unique_ptr<juce::AudioProcessorEditor> editor(p.createEditor());
+  std::unique_ptr<juce::AudioProcessorEditor> editor(p.createEditor());editor->setVisible(true);
   auto combo=[&](const juce::String& name){for(int i=0;i<editor->getNumChildComponents();++i)if(auto* c=dynamic_cast<juce::ComboBox*>(editor->getChildComponent(i)))if(c->getName()==name)return c;return (juce::ComboBox*)nullptr;};
   auto* target=combo("Project target track");auto* reference=combo("Project reference track");check(target&&reference&&target->getNumItems()==3&&reference->getNumItems()==4,"Real project tracks populate both dropdowns");target->setSelectedId(100,juce::sendNotificationSync);reference->setSelectedId(101,juce::sendNotificationSync);waitSession(lead);
   check(lead->referenceClicks==std::vector<noori::Sample>{14400,38400},"Project reference honours trimmed audio and project offset");
-  juce::TextButton* quantize=nullptr;for(int i=0;i<editor->getNumChildComponents();++i)if(auto* b=dynamic_cast<juce::TextButton*>(editor->getChildComponent(i)))if(b->getButtonText()=="Quantize selected track")quantize=b;
+  juce::TextButton* quantize=nullptr;for(int i=0;i<editor->getNumChildComponents();++i)if(auto* b=dynamic_cast<juce::TextButton*>(editor->getChildComponent(i)))if(b->getName()=="Quantize vocal")quantize=b;
   check(quantize&&quantize->isEnabled(),"Selected project track action active without selecting markers");quantize->onClick();waitSession(lead);check(lead->attacks[0].target==14400&&lead->attacks[1].target==38400&&lead->attacks[2].target==76800,"Track quantization matches reference and preserves attacks outside trimmed event");
   check(std::abs(lead->snapshot()->channels[0][14400]-.8f)<1e-7,"ARA project-reference transient rendered at exact project-mapped sample");
   lead->overlay=true;dynamic_cast<NooriEditor*>(editor.get())->refresh();

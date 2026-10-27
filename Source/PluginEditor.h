@@ -20,12 +20,18 @@ private:
   void mouseDown(const juce::MouseEvent&)override;void mouseDrag(const juce::MouseEvent&)override;void mouseUp(const juce::MouseEvent&)override;
   void mouseWheelMove(const juce::MouseEvent&,const juce::MouseWheelDetails&)override;
  private:
+  struct Bin {float low=0,high=0,rms=0;};
+  struct Envelope {const noori::Audio* audio=nullptr;noori::Sample first=0,last=0;int width=0;float peak=0;std::vector<Bin> bins;};
+  std::vector<Envelope> envelopes;
+  int referenceBottom()const{return 30+(getHeight()-30)/3;}
+  int originalBottom()const{return 30+2*(getHeight()-30)/3;}
   NooriEditor& editor;bool overview;int dragging=-1;noori::Sample dragTarget=0;bool rangeSelecting=false,additiveRange=false,sourceRange=false;float rangeStart=0,rangeEnd=0;
   noori::Sample sampleAt(float)const;float xAt(noori::Sample)const;
  };
  NooriProcessor& processor;std::shared_ptr<EditSession> session;
  juce::LookAndFeel_V4 look;
  juce::Colour bg,panel,line,muted,purple,ink,waveBg,referenceColour;
+ std::unique_ptr<juce::Drawable> defaultLogo;
  juce::Image logo;std::shared_ptr<const juce::MemoryBlock> loadedLogo;std::uint64_t seenSerial=0;
  void applyTheme();void edit(juce::String,std::function<void()>,bool merge=false);void restoreUI();void historyStep(bool);
 
@@ -36,7 +42,7 @@ private:
  juce::ToggleButton sampleAccurate{"Sample accurate"},breath{"Breath protection"},consonant{"Consonant protection"},vowel{"Long vowel protection"},emotion{"Emotional phrase protection"},audition{"Audition with Cubase transport"};
  juce::TextButton themeButton{"Dark theme"},overlayButton{"Overlay reference"},addButton{"Add attack"},removeButton{"Remove selected"};
  juce::TextButton referenceButton{"Import reference"},selectAllButton{"Select all attacks"},clearSelectionButton{"Clear selection"},anchorButton{"Audio start = cursor"};
- juce::ComboBox targetTrack,targetEvent,referenceTrack,referenceAnalysis;
+ juce::ComboBox targetTrack,targetEvent,referenceTrack,referenceAnalysis,referenceStart;
  juce::Slider manualBpm;
  std::vector<ProjectTrack> projectTracks;
  std::vector<std::shared_ptr<EditSession>> batchSessions,groupSessions;

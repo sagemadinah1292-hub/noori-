@@ -1,7 +1,20 @@
 # NOORI TURAB TEMPO
+
+## 0.3.1 reference and timing fixes
+
+The main Quantize current vocal / Quantize chosen track action matches safe exact anchors and lets other detected attacks follow the phrase warp. Multiple syllables are never collapsed onto a single click. The status counts exact anchors, following attacks and moved attacks. Align selected attacks remains a strict all-selected operation and can reject unsafe targets.
+
+The three waveform lanes are Reference, Original vocal and Corrected vocal. Displays use cached full-sample peak envelopes and are enlarged for viewing; this does not change audio gain. The reference lane is always visible, independent of the overlay guide toggle.
+
+Before importing, choose Ref start: vocal start (default), project zero or Cubase cursor. Reimport existing reference files to correct an old cursor-based placement. Reference start applies to the next import; it does not reposition an already imported file. Nonoverlapping references now produce a clear placement message.
+
+The EDIT VOCAL selector identifies the loaded vocal. Other project tracks appear only if Cubase exposes them through ARA; the plugin cannot invent access to hidden tracks. The supplied Noori Tempo Track SVG is included as default vector branding.
+
+Onset accuracy on the reported real vocal is still unverified: a short original vocal/reference WAV pair is required. Detection heuristics are unchanged in this update; waveform visibility, reference placement and automatic matching are corrected.
+
 **Preserve the Emotion. Perfect the Timing.**
 
-Experimental C++20/JUCE Windows x64 VST3 vocal attack editor, intended for Cubase Pro 15. Version 0.3.0 is a development build, not a validated production release. See [VALIDATION.md](VALIDATION.md) before using it in a session. A source archive is not a Windows installation package.
+Experimental C++20/JUCE Windows x64 VST3 vocal attack editor, intended for Cubase Pro 15. Version 0.3.1 is a development build, not a validated production release. See [VALIDATION.md](VALIDATION.md) before using it in a session. A source archive is not a Windows installation package.
 
 ## 0.3.0: complete edit history, themes and timing review
 Use **Audio Extension / ARA**, not an ordinary track insert, for project-track dropdowns. Assign this extension to the vocal and to the reference track's audio events. A built-in Cubase metronome or MIDI track has no audio source for the plugin to read: render it to an audio track first. The dropdown can list only tracks/events Cubase exposes to this plugin's ARA document. Native Cubase factory discovery and access still require verification on the user's machine.

@@ -48,6 +48,15 @@ int main(int argc,char** argv) {try {
   require(quantize(markers,a.length(),0,Timeline(sr),inherited,false,clicks)[0].target==clicks[0],"Exact reference ignores inherited natural timing controls");
   bool unordered=false;try{quantize(markers,a.length(),0,Timeline(sr),defaults,false,{clicks[1],clicks[0]});}catch(const std::invalid_argument&){unordered=true;}
   require(unordered,"Unordered reference rejected rather than silently missing nearest attack");
+  Attacks clustered{{(Sample)std::llround(sr*.78),(Sample)std::llround(sr*.78),1,1,false},{(Sample)std::llround(sr*.81),(Sample)std::llround(sr*.81),.5f,1,false}};
+  auto automatic=autoQuantize(clustered,a.length(),0,Timeline(sr),defaults,false,{(Sample)std::llround(sr*.75)});
+  require(automatic.matched==1&&automatic.followed==1,"Automatic alignment groups collisions instead of rejecting the whole vocal");
+  require(automatic.attacks[0].target==(Sample)std::llround(sr*.75)&&automatic.attacks[1].target>automatic.attacks[0].target,"One exact anchor per click with ordered phrase attacks");
+  require(automatic.attacks[1].source==clustered[1].source,"Automatic alignment preserves original detected onsets");
+  auto safeGroup=autoQuantize(group,a.length(),0,Timeline(sr),defaults,true,groupClicks);
+  require(safeGroup.attacks[0].target==groupClicks[0]&&safeGroup.attacks[1].target==groupClicks[1]&&safeGroup.attacks[2].target==group[2].target,"Automatic cropped event preserves unselected attacks");
+  bool noMatch=false;try{autoQuantize(clustered,a.length(),0,Timeline(sr),defaults,false,{(Sample)std::llround(sr*3.9)});}catch(...){noMatch=true;}
+  require(noMatch,"No feasible automatic anchors is explicit failure, not false success");
   bool strictRejected=false;try{Attacks tooFar{{(Sample)std::llround(sr*.2),(Sample)std::llround(sr*.2),1,1,true}};quantize(tooFar,a.length(),0,Timeline(sr),defaults,false,{},true);}catch(...){strictRejected=true;}
   require(strictRejected,"Unsafe exact BPM request rejected instead of partial off-grid warp");
   Attacks afterTempo{{(Sample)std::llround(sr*3.52),(Sample)std::llround(sr*3.52),1,1,true}};

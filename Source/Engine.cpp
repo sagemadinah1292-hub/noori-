@@ -9,6 +9,7 @@
 #include <iomanip>
 #include <random>
 #include <limits>
+#include <map>
 namespace noori {
 static constexpr double pi = std::numbers::pi;
 void Audio::validate() const {
@@ -191,6 +192,37 @@ Attacks quantize(const Attacks& attacks,Sample length,Sample origin,const Timeli
  if(selectedOnly){auto result=attacks;for(std::size_t i=0;i<out.size();++i)if(out[i].selected)result=moveAttack(result,i,out[i].target,length,s.maxStretch);return result;}
  return constrain(out,length,std::clamp(s.maxStretch,1.,2.));
 }
+AutoAlignment autoQuantize(const Attacks& attacks,Sample length,Sample origin,const Timeline& timeline,const Settings& settings,bool selectedOnly,const std::vector<Sample>& reference) {
+ if(!std::is_sorted(reference.begin(),reference.end()))throw std::invalid_argument("Reference attacks must be ordered");
+ auto input=attacks;for(auto& a:input)a.target=a.source;validateMarkers(input,length,settings.maxStretch);
+ std::map<Sample,Sample> anchors{{0,0},{length,length}};
+ for(const auto& a:attacks)if(selectedOnly&&!a.selected)anchors[a.source]=a.target;
+ struct Candidate{std::size_t index;Sample target;double score;};std::vector<Candidate> candidates;
+ double step=4./settings.division;if(settings.division!=4&&settings.division!=8&&settings.division!=16&&settings.division!=32)throw std::invalid_argument("Unsupported grid");
+ if(settings.rhythm==Settings::Rhythm::triplet)step*=2./3;
+ if(settings.rhythm==Settings::Rhythm::dotted)step*=1.5;
+ int eligible=0;
+ for(std::size_t i=0;i<attacks.size();++i){const auto& a=attacks[i];if(selectedOnly&&!a.selected)continue;++eligible;Sample target=0;
+  if(!reference.empty()){auto it=std::lower_bound(reference.begin(),reference.end(),a.source);target=it==reference.end()?reference.back():*it;if(it!=reference.begin()&&std::abs(double(*(it-1)-a.source))<=std::abs(double(target-a.source)))target=*(it-1);}
+  else {auto k=std::llround(timeline.quarterAt(a.source+origin)/step);target=timeline.sampleAt(k*step)-origin;}
+  if(target<=0||target>=length)continue;
+  candidates.push_back({i,target,std::abs(double(target-a.source))/(.25+std::clamp(double(a.confidence),0.,1.))});
+ }
+ std::stable_sort(candidates.begin(),candidates.end(),[](const auto& a,const auto& b){return a.score<b.score;});
+ std::vector<Sample> accepted;const double limit=settings.maxStretch;
+ for(const auto& c:candidates){auto src=attacks[c.index].source;auto next=anchors.upper_bound(src);auto prev=std::prev(next);auto t=c.target;
+  auto feasible=[&](Sample ds,Sample dt){double ratio=double(dt)/double(ds);return dt>0&&ratio>=1/limit+1e-8&&ratio<=limit-1e-8;};
+  if((t==src&&prev->second==prev->first&&next->second==next->first)|| (feasible(src-prev->first,t-prev->second)&&feasible(next->first-src,next->second-t))){anchors[src]=t;accepted.push_back(src);}
+ }
+ AutoAlignment result;result.attacks=attacks;
+ for(;;){for(auto& a:result.attacks){auto it=anchors.lower_bound(a.source);if(it!=anchors.end()&&it->first==a.source)a.target=it->second;else{auto prev=std::prev(it);a.target=prev->second+(Sample)std::llround(double(a.source-prev->first)*double(it->second-prev->second)/double(it->first-prev->first));}}
+  try{validateMarkers(result.attacks,length,settings.maxStretch);break;}catch(const std::exception&){if(accepted.empty())throw;anchors.erase(accepted.back());accepted.pop_back();}
+ }
+ result.matched=(int)accepted.size();result.followed=eligible-result.matched;
+ if(!result.matched&&eligible)throw std::runtime_error("No safe timing matches. Check reference start/overlap, choose a finer click/grid or increase the stretch limit. Previous audio kept.");
+ return result;
+}
+
 Attacks moveAttack(const Attacks& a,std::size_t index,Sample target,Sample length,double limit) {
  validateMarkers(a,length,limit);if(index>=a.size())throw std::out_of_range("Marker index");auto out=a;
  Sample ps=index?a[index-1].source:0,pt=index?a[index-1].target:0;
