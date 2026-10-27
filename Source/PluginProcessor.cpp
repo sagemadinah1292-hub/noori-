@@ -90,7 +90,7 @@ void EditSession::load(std::function<noori::Audio()> reader,juce::String title,n
  if(busy)return;
  const auto markerState=restoreMarkers;const auto renderSettings=settings;
  submit([this,reader=std::move(reader),markerState,renderSettings,title,start,map] {Result r;auto a=std::make_shared<noori::Audio>(reader());a->validate();auto bytes=(std::size_t)a->length()*a->channels.size()*sizeof(float);if(bytes>128ull*1024*1024||retainedBytes+bytes>memoryLimit)throw std::runtime_error("Audio/session memory limit reached; open a new instance.");retainedBytes+=bytes;r.newSource=true;r.source=a;r.revision.audio=a;r.sourceName=title;r.sourceOrigin=start;r.sourceTimeline=map;
- if(!markerState.empty()){r.revision.attacks=noori::deserializeAttacks(markerState,a->length());auto output=std::make_shared<noori::Audio>(noori::render(*a,r.revision.attacks,renderSettings));r.revision.audio=output;retainedBytes+=bytes;}
+ if(!markerState.empty()){r.revision.attacks=noori::deserializeAttacks(markerState,a->length());auto replaySettings=renderSettings;noori::Sample previousSource=0,previousTarget=0;for(std::size_t i=0;i<=r.revision.attacks.size();++i){auto source=i<r.revision.attacks.size()?r.revision.attacks[i].source:a->length(),target=i<r.revision.attacks.size()?r.revision.attacks[i].target:a->length();double ratio=double(target-previousTarget)/double(source-previousSource);replaySettings.maxStretch=std::min(2.,std::max(replaySettings.maxStretch,std::max(ratio,1/ratio)));previousSource=source;previousTarget=target;}auto output=std::make_shared<noori::Audio>(noori::render(*a,r.revision.attacks,replaySettings));r.revision.audio=output;retainedBytes+=bytes;}
  return r;});
 }
 void EditSession::analyse() {
