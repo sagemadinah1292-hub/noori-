@@ -57,7 +57,7 @@ public:
  std::vector<noori::Sample> referenceClicks;
  juce::String referenceName,referenceProjectID;bool referenceIsClick=true;
  bool useReference=false,exactBpm=true;
- void loadProjectReference(std::vector<ProjectReferenceRegion>,juce::String,bool clickTrack=true,bool alignWhenReady=false,bool selectedOnly=false,AttackRange range={},juce::String projectID={});
+ void loadProjectReference(std::vector<ProjectReferenceRegion>,juce::String,bool clickTrack=true,bool alignWhenReady=false,bool selectedOnly=false,AttackRange range={},juce::String projectID={},bool automatic=false);
  std::shared_ptr<const noori::Audio> snapshot()const;
  void selectAll(bool selected=true);void selectRange(noori::Sample,noori::Sample,bool additive=false,bool sourceCoordinates=false);
  void anchorTo(noori::Sample);
@@ -68,7 +68,7 @@ public:
  std::atomic<float> progress{0};
  std::function<void()> onChanged;
  void load(std::function<noori::Audio()> reader, juce::String nameIn, noori::Sample start, noori::Timeline map);
- void analyse(); void align(bool selectedOnly=false,AttackRange range={}); void move(std::size_t,noori::Sample); void reset();
+ void analyse(); void align(bool selectedOnly=false,AttackRange range={},bool automatic=false); void move(std::size_t,noori::Sample); void reset();
  void undo(); void redo(); bool canUndo()const; bool canRedo()const;
  void cancel(); void settle();
  const noori::Audio* displayed()const {return compare.load()?original.get():audible.load();}
@@ -77,7 +77,7 @@ public:
  void setSelected(std::size_t index,bool additive);
 private:
  juce::ThreadPool pool{1};
- struct Result {std::shared_ptr<const noori::Audio> source;Revision revision;juce::String error,message; bool newSource=false,referenceOnly=false,alignWhenReady=false,selectedOnly=false; std::vector<noori::Sample> clicks;std::shared_ptr<const noori::Audio> referenceAudio;juce::String sourceName;noori::Sample sourceOrigin=0;noori::Timeline sourceTimeline;juce::String referenceTitle,projectID;bool clickTrack=true;AttackRange range;};
+ struct Result {std::shared_ptr<const noori::Audio> source;Revision revision;juce::String error,message; bool newSource=false,referenceOnly=false,alignWhenReady=false,selectedOnly=false,automatic=false; std::vector<noori::Sample> clicks;std::shared_ptr<const noori::Audio> referenceAudio;juce::String sourceName;noori::Sample sourceOrigin=0;noori::Timeline sourceTimeline;juce::String referenceTitle,projectID;bool clickTrack=true;AttackRange range;};
  std::mutex pendingMutex;
  std::unique_ptr<Result> pending;
  std::atomic<bool> cancelled{false};

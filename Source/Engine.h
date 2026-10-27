@@ -40,6 +40,8 @@ using Progress = std::function<bool(float)>; // false cancels
 std::vector<Sample> detectClicks(const Audio&);
 Attacks detect(const Audio&, const Settings&, Progress = {});
 Attacks quantize(const Attacks&, Sample length, Sample projectStart, const Timeline&, const Settings&, bool selectedOnly = false, const std::vector<Sample>& reference = {}, bool exactBpm = false);
+struct AutoAlignment {Attacks attacks;int matched=0,followed=0;};
+AutoAlignment autoQuantize(const Attacks&,Sample length,Sample projectStart,const Timeline&,const Settings&,bool selectedOnly=false,const std::vector<Sample>& reference={});
 Attacks moveAttack(const Attacks&, std::size_t index, Sample target, Sample length, double maxStretch);
 Audio render(const Audio&, const Attacks&, const Settings&, Progress = {});
 std::string serializeAttacks(const Attacks&);
