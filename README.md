@@ -1,5 +1,18 @@
 # NOORI TURAB TEMPO
 
+## 0.3.2 playback and printing
+
+The default SVG logo is 10% smaller. Enable **Click to play**, then click a waveform to request Cubase playback from that project position; the time ruler also requests playback directly. Turn the mode off to edit attacks. **Stop** requests Cubase transport stop. These controls require the optional ARA host playback controller. If unavailable, use Cubase transport. Playback follows Cubase mute/solo and routing, and does not solo the edited track automatically.
+
+**Print options** offers corrected WAV export and explains the supported Cubase workflow. For a new printed track, select the edited audio track in Cubase and choose Edit > Render in Place > Render Settings. Keep the original ARA track for further timing edits. For a committed event, use Audio > Extensions > Make Extension Permanent on a duplicate. NOORI cannot create project tracks through ARA. Printed WAVs contain baked audio rather than live NOORI anchors. Re-quantize after a tempo change and render again.
+
+The ARA renderer now supports offline rendering when the transport playing flag is false. Stopped realtime playback remains silent. Already-loaded sources do not create unnecessary read-ahead readers. Native Cubase Render in Place and playback-request acceptance still require testing.
+
+Words sounding stretched need an original/reference WAV comparison. This is not evidence of an Urdu-specific limitation. Try Settings > Maximum local stretch ratio > 1.15x (gentle), then quantize again. A lower limit may match fewer exact anchors. Detector and stretching algorithms are unchanged in this release.
+
+Cubase documentation: https://www.steinberg.help/r/cubase-pro/15.0/en/cubase_nuendo/topics/rendering_to_audio/rendering_to_audio_rendering_tracks_t.html
+
+
 ## 0.3.1 reference and timing fixes
 
 The main Quantize current vocal / Quantize chosen track action matches safe exact anchors and lets other detected attacks follow the phrase warp. Multiple syllables are never collapsed onto a single click. The status counts exact anchors, following attacks and moved attacks. Align selected attacks remains a strict all-selected operation and can reject unsafe targets.
@@ -14,7 +27,7 @@ Onset accuracy on the reported real vocal is still unverified: a short original 
 
 **Preserve the Emotion. Perfect the Timing.**
 
-Experimental C++20/JUCE Windows x64 VST3 vocal attack editor, intended for Cubase Pro 15. Version 0.3.1 is a development build, not a validated production release. See [VALIDATION.md](VALIDATION.md) before using it in a session. A source archive is not a Windows installation package.
+Experimental C++20/JUCE Windows x64 VST3 vocal attack editor, intended for Cubase Pro 15. Version 0.3.2 is a development build, not a validated production release. See [VALIDATION.md](VALIDATION.md) before using it in a session. A source archive is not a Windows installation package.
 
 ## 0.3.0: complete edit history, themes and timing review
 Use **Audio Extension / ARA**, not an ordinary track insert, for project-track dropdowns. Assign this extension to the vocal and to the reference track's audio events. A built-in Cubase metronome or MIDI track has no audio source for the plugin to read: render it to an audio track first. The dropdown can list only tracks/events Cubase exposes to this plugin's ARA document. Native Cubase factory discovery and access still require verification on the user's machine.

@@ -21,7 +21,11 @@ int main(int argc,char** argv){installTestCrashDiagnostics();try{
  check(factory->compatibleDocumentArchiveIDsCount==3&&juce::String(factory->compatibleDocumentArchiveIDs[0])=="audio.nooriturab.tempo.archive.1"&&juce::String(factory->compatibleDocumentArchiveIDs[1])=="audio.nooriturab.tempo.archive.2","ARA backward archive IDs");
  projectHostTests(factory,argc>1?juce::File::getCurrentWorkingDirectory().getChildFile(argv[1]):juce::File::getCurrentWorkingDirectory());
 #endif
- auto processorStorage=std::make_unique<NooriProcessor>();auto& p=*processorStorage;HostTransport host;p.setPlayHead(&host);p.setRateAndBufferSizeDetails(48000,512);p.prepareToPlay(48000,512);juce::AudioBuffer<float> b(2,512);juce::MidiBuffer midi;b.clear();p.processBlock(b,midi);check(p.bpm==80&&p.numerator==6&&p.denominator==8,"Host tempo/time signature");
+ auto processorStorage=std::make_unique<NooriProcessor>();auto& p=*processorStorage;
+#if JucePlugin_Enable_ARA
+ check(!canRequestARAPlayback(p)&&!requestARAPlayback(p,1,true)&&!requestARAStop(p),"Absent ARA playback controller is handled safely");
+#endif
+ HostTransport host;p.setPlayHead(&host);p.setRateAndBufferSizeDetails(48000,512);p.prepareToPlay(48000,512);juce::AudioBuffer<float> b(2,512);juce::MidiBuffer midi;b.clear();p.processBlock(b,midi);check(p.bpm==80&&p.numerator==6&&p.denominator==8,"Host tempo/time signature");
  auto audio=std::make_shared<noori::Audio>();audio->sampleRate=48000;audio->channels.resize(2,std::vector<float>(48000*4));
  for(auto& c:audio->channels)for(int i=0;i<(int)c.size();++i){double time=i/48000.;double phase=std::fmod(time,.75);double envelope=phase<.04?phase/.04:phase<.50?std::exp(-(phase-.04)*4):0;c[(std::size_t)i]=float(.55*envelope*(std::sin(2*std::numbers::pi*180*time)+.2*std::sin(2*std::numbers::pi*360*time)));}
  p.insertSession->load([audio]{return *audio;},"Synthetic test vocal | 48 kHz",0,noori::Timeline());waitSession(p.insertSession);p.insertSession->align();waitSession(p.insertSession);check(!p.insertSession->attacks.empty(),"Attack analysis");

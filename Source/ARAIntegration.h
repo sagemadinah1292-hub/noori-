@@ -10,5 +10,8 @@ public:
 };
 std::shared_ptr<EditSession> selectedARASession(NooriProcessor&);
 std::vector<ProjectTrack> availableProjectTracks(NooriProcessor&);
+bool canRequestARAPlayback(NooriProcessor&);
+bool requestARAPlayback(NooriProcessor&,double projectSeconds,bool start);
+bool requestARAStop(NooriProcessor&);
 bool configureProjectRegion(NooriProcessor&,const juce::String& id);
 #endif

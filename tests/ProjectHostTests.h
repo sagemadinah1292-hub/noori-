@@ -16,10 +16,19 @@ class TestArchives final:public ARA::Host::ArchivingControllerInterface {
  void notifyDocumentUnarchivingProgress(float)noexcept override{}
  ARA::ARAPersistentID getDocumentArchiveID(ARA::ARAArchiveReaderHostRef)noexcept override{return "audio.nooriturab.tempo.archive.3";}
 };
+class TestPlaybackControl final:public ARA::Host::PlaybackControllerInterface {
+public:
+ double position=-1;int starts=0,stops=0,seeks=0;
+ void requestStartPlayback()noexcept override{++starts;}
+ void requestStopPlayback()noexcept override{++stops;}
+ void requestSetPlaybackPosition(ARA::ARATimePosition value)noexcept override{position=value;++seeks;}
+ void requestSetCycleRange(ARA::ARATimePosition,ARA::ARATimeDuration)noexcept override{}
+ void requestEnableCycle(bool)noexcept override{}
+};
 inline void projectHostTests(const ARA::ARAFactory* factory,const juce::File& output){
  std::cerr<<"ARA regression: initialize factory\n";
  ARA::ARAInterfaceConfiguration config{};config.structSize=sizeof(config);config.desiredApiGeneration=factory->highestSupportedApiGeneration;factory->initializeARAWithConfiguration(&config);
- TestAudioAccess audioAccess;TestArchives archives;ARA::Host::DocumentControllerHostInstance host(&audioAccess,&archives);
+ TestAudioAccess audioAccess;TestArchives archives;TestPlaybackControl playbackControl;ARA::Host::DocumentControllerHostInstance host(&audioAccess,&archives,nullptr,nullptr,&playbackControl);
  ARA::ARADocumentProperties document{};document.structSize=sizeof(document);document.name="Noori regression project";
  std::cerr<<"ARA regression: create document\n";
  auto* instance=factory->createDocumentControllerWithDocument(&host,&document);check(instance!=nullptr,"ARA document construction");ARA::Host::DocumentController controller(instance);
@@ -40,22 +49,28 @@ inline void projectHostTests(const ARA::ARAFactory* factory,const juce::File& ou
  controller.endEditing();
  {
   std::cerr<<"ARA regression: bind processor\n";
-  auto processorStorage=std::make_unique<NooriProcessor>();auto& p=*processorStorage;p.bindToARA(instance->documentControllerRef,ARA::kARAPlaybackRendererRole|ARA::kARAEditorRendererRole|ARA::kARAEditorViewRole,ARA::kARAEditorViewRole);p.setRateAndBufferSizeDetails(48000,512);p.prepareToPlay(48000,512);
+  auto processorStorage=std::make_unique<NooriProcessor>();auto& p=*processorStorage;p.bindToARA(instance->documentControllerRef,ARA::kARAPlaybackRendererRole|ARA::kARAEditorRendererRole|ARA::kARAEditorViewRole,ARA::kARAEditorViewRole|ARA::kARAPlaybackRendererRole);p.setRateAndBufferSizeDetails(48000,512);p.prepareToPlay(48000,512);
   std::cerr<<"ARA regression: enumerate tracks\n";
   auto tracks=availableProjectTracks(p);check(tracks.size()==2&&tracks[1].name=="Metronome project track","Enumerate actual ARA project tracks, including unselected reference");
   for(int i=0;i<2;++i){auto a=std::make_shared<noori::Audio>();a->sampleRate=48000;a->channels.resize(1,std::vector<float>(96000));for(auto sample:i?std::vector<int>{14400,38400,76800}:std::vector<int>{16800,40800,76800})for(int j=0;j<1200;++j)a->channels[0][(std::size_t)(sample+j)]=.8f*(float)std::exp(-j/300.)*(float)std::cos(2*std::numbers::pi*1000*j/48000.);auto s=tracks[(std::size_t)i].regions[0].session;s->load([a]{return *a;},tracks[(std::size_t)i].name,468000,noori::Timeline());waitSession(s);}
+  p.releaseResources();check(p.getPlaybackRenderer()!=nullptr,"ARA playback renderer bound");p.getPlaybackRenderer()->addPlaybackRegion(regions[0]);p.prepareToPlay(48000,512);
+  check(canRequestARAPlayback(p)&&requestARAPlayback(p,10.25,true)&&playbackControl.starts==1&&playbackControl.position==10.25,"ARA host receives seek then start");check(requestARAStop(p)&&playbackControl.stops==1,"ARA host receives stop");
   auto lead=tracks[0].regions[0].session;lead->attacks={{16800,16800,1,1,false},{40800,40800,1,1,false},{76800,76800,1,1,false}};
   std::cerr<<"ARA regression: create editor\n";
   std::unique_ptr<juce::AudioProcessorEditor> editor(p.createEditor());editor->setVisible(true);
   auto combo=[&](const juce::String& name){for(int i=0;i<editor->getNumChildComponents();++i)if(auto* c=dynamic_cast<juce::ComboBox*>(editor->getChildComponent(i)))if(c->getName()==name)return c;return (juce::ComboBox*)nullptr;};
   auto* target=combo("Project target track");auto* reference=combo("Project reference track");check(target&&reference&&target->getNumItems()==3&&reference->getNumItems()==4,"Real project tracks populate both dropdowns");target->setSelectedId(100,juce::sendNotificationSync);reference->setSelectedId(101,juce::sendNotificationSync);waitSession(lead);
+  juce::TextButton* clickPlay=nullptr;juce::TextButton* stop=nullptr;juce::Component* wave=nullptr;for(int i=0;i<editor->getNumChildComponents();++i){auto* c=editor->getChildComponent(i);if(c->getName()=="Timing waveforms")wave=c;if(auto* button=dynamic_cast<juce::TextButton*>(c)){if(button->getName()=="Click to play")clickPlay=button;if(button->getButtonText()=="Stop")stop=button;}}
+  check(clickPlay&&clickPlay->isEnabled()&&stop&&wave,"ARA playback controls enabled");clickPlay->setToggleState(true,juce::dontSendNotification);clickPlay->onClick();const auto markerCount=lead->attacks.size();const int previousStarts=playbackControl.starts;auto point=juce::Point<float>(wave->getWidth()*.4f,wave->getHeight()*.8f);auto now=juce::Time::getCurrentTime();juce::MouseEvent click(juce::Desktop::getInstance().getMainMouseSource(),point,juce::ModifierKeys{},1,0,0,0,0,wave,wave,now,point,now,1,false);wave->mouseDown(click);wave->mouseUp(click);wave->mouseDoubleClick(click);
+  auto sample=(noori::Sample)std::llround(double(point.x)/wave->getWidth()*lead->original->length());check(playbackControl.starts==previousStarts+1&&std::abs(playbackControl.position-double(sample+lead->origin)/lead->original->sampleRate)<1e-6,"Waveform click maps through source origin into project time");check(lead->attacks.size()==markerCount,"Click-to-play does not add/edit attack markers");stop->onClick();check(playbackControl.stops==2,"Stop button reaches ARA host");clickPlay->setToggleState(false,juce::dontSendNotification);
   check(lead->referenceClicks==std::vector<noori::Sample>{14400,38400},"Project reference honours trimmed audio and project offset");
   juce::TextButton* quantize=nullptr;for(int i=0;i<editor->getNumChildComponents();++i)if(auto* b=dynamic_cast<juce::TextButton*>(editor->getChildComponent(i)))if(b->getName()=="Quantize vocal")quantize=b;
   check(quantize&&quantize->isEnabled(),"Selected project track action active without selecting markers");quantize->onClick();waitSession(lead);check(lead->attacks[0].target==14400&&lead->attacks[1].target==38400&&lead->attacks[2].target==76800,"Track quantization matches reference and preserves attacks outside trimmed event");
   check(std::abs(lead->snapshot()->channels[0][14400]-.8f)<1e-7,"ARA project-reference transient rendered at exact project-mapped sample");
+  juce::AudioBuffer<float> offline(2,512);juce::AudioPlayHead::PositionInfo offlinePosition;offlinePosition.setTimeInSamples(482400);offlinePosition.setIsPlaying(false);offline.clear();check(p.getPlaybackRenderer()->processBlock(offline,juce::AudioProcessor::Realtime::no,offlinePosition),"ARA offline render handled with stopped transport");check(std::abs(offline.getSample(0,0)-.8f)<1e-5,"Offline render contains corrected transient, not silence");offline.clear();p.getPlaybackRenderer()->processBlock(offline,juce::AudioProcessor::Realtime::yes,offlinePosition);check(offline.getMagnitude(0,512)==0,"Stopped realtime transport remains silent");
   lead->overlay=true;dynamic_cast<NooriEditor*>(editor.get())->refresh();
   output.createDirectory();juce::Image image(juce::Image::ARGB,editor->getWidth(),editor->getHeight(),true,juce::SoftwareImageType{});juce::Graphics graphics(image);editor->paintEntireComponent(graphics,true);juce::PNGImageFormat png;auto stream=output.getChildFile("ProjectPreview.png").createOutputStream();if(stream){stream->setPosition(0);stream->truncate();}check(stream&&png.writeImageToStream(image,*stream),"ARA project editor preview");
-  p.releaseResources();
+  p.releaseResources();p.getPlaybackRenderer()->removePlaybackRegion(regions[0]);
  }
  controller.beginEditing();for(int i=1;i>=0;--i){controller.destroyPlaybackRegion(regions[(std::size_t)i]);controller.destroyAudioModification(modifications[(std::size_t)i]);controller.destroyAudioSource(sources[(std::size_t)i]);controller.destroyRegionSequence(sequences[(std::size_t)i]);}controller.destroyMusicalContext(context);controller.endEditing();controller.destroyDocumentController();factory->uninitializeARA();
 }
