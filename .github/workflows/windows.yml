@@ -1,7 +1,7 @@
 name: Windows x64 VST3
 on:
   push:
-    branches-ignore: ['codex/tempo-reference-lanes', 'codex/tempo-click-play']
+    branches-ignore: ['codex/tempo-reference-lanes', 'codex/tempo-click-play', 'codex/tempo-gentle-vocals']
   pull_request:
   workflow_dispatch:
 concurrency:

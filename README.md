@@ -1,5 +1,14 @@
 # NOORI TURAB TEMPO
 
+## 0.3.3 gentle vocal timing
+
+Choose **Gentle vocal timing** from the preset menu, then press **Quantize current vocal** or **Quantize chosen track** again. This reduces the allowed local time-warp ratio to 1.10 (approximately 0.91–1.10 times the original segment duration), compared with the existing 1.33 default. Feasible matched anchors stay exact; more difficult targets are left to follow the phrase warp rather than forcing large duration changes. Fewer exact matches may result. This is a gentler alignment option, not a guarantee that every word retains precisely its original duration.
+
+The preset preserves the loaded reference and detector settings. It switches natural BPM timing to exact-anchor matching with zero humanize, swing, offset and tolerance. It does not erase existing markers or modify audio until you quantize again. The 1.10 limit is also available in Settings. Existing project limits remain unchanged until explicitly selected. Preset identity and settings are saved with project state. Existing saved edits replay with their historical marker ratios (still subject to the hard global limit), so choosing a lower limit and saving before re-quantizing does not invalidate the previous audio. The new limit applies to the next alignment.
+
+The reported original/corrected MP3 pair and click WAV were compared privately. The reference is approximately 128 BPM. A local reproduction with the original vocal, reference clicks and screenshot-like detector settings showed local duration ratios up to about 1.32 under the existing limit; using 1.10 reduced the tested range to about 0.91–1.09, with fewer exact anchors. These measurements validate the mechanical limit, not perceived pronunciation quality or word boundaries. Neither private audio nor derived audio is included in the repository or package. Native Cubase listening acceptance remains necessary.
+
+
 ## 0.3.2 playback and printing
 
 The default SVG logo is 10% smaller. Enable **Click to play**, then click a waveform to request Cubase playback from that project position; the time ruler also requests playback directly. Turn the mode off to edit attacks. **Stop** requests Cubase transport stop. These controls require the optional ARA host playback controller. If unavailable, use Cubase transport. Playback follows Cubase mute/solo and routing, and does not solo the edited track automatically.
@@ -27,7 +36,7 @@ Onset accuracy on the reported real vocal is still unverified: a short original 
 
 **Preserve the Emotion. Perfect the Timing.**
 
-Experimental C++20/JUCE Windows x64 VST3 vocal attack editor, intended for Cubase Pro 15. Version 0.3.2 is a development build, not a validated production release. See [VALIDATION.md](VALIDATION.md) before using it in a session. A source archive is not a Windows installation package.
+Experimental C++20/JUCE Windows x64 VST3 vocal attack editor, intended for Cubase Pro 15. Version 0.3.3 is a development build, not a validated production release. See [VALIDATION.md](VALIDATION.md) before using it in a session. A source archive is not a Windows installation package.
 
 ## 0.3.0: complete edit history, themes and timing review
 Use **Audio Extension / ARA**, not an ordinary track insert, for project-track dropdowns. Assign this extension to the vocal and to the reference track's audio events. A built-in Cubase metronome or MIDI track has no audio source for the plugin to read: render it to an audio track first. The dropdown can list only tracks/events Cubase exposes to this plugin's ARA document. Native Cubase factory discovery and access still require verification on the user's machine.
