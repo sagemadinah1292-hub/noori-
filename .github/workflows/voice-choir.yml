@@ -1,0 +1,38 @@
+name: Voice Choir Windows x64
+on:
+  pull_request:
+    paths: ['voice-choir/**', '.github/workflows/voice-choir.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: voice-choir-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure Windows x64
+        run: cmake -S voice-choir -B build-choir -G "Visual Studio 17 2022" -A x64
+      - name: Compile VST3 and tests
+        run: cmake --build build-choir --config Release --parallel 2
+      - name: Test DSP, processor and editor
+        run: ctest --test-dir build-choir -C Release --output-on-failure
+      - name: Verify and package
+        shell: pwsh
+        run: ./voice-choir/scripts/Package.ps1
+      - name: Upload installable Windows package
+        uses: actions/upload-artifact@v4
+        with:
+          name: Noori-Voice-Choir-0.1.0-Windows-x64
+          path: dist-choir/Noori-Voice-Choir-0.1.0-Windows-x64.zip
+          if-no-files-found: error
+      - name: Upload test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Voice-Choir-Test-Logs
+          path: build-choir/Testing/Temporary/
+          if-no-files-found: ignore
