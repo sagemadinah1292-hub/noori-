@@ -65,4 +65,3 @@ Dependencies in the bundled applications:
 
 Dependencies in the build system:
 - [Android Gradle](examples/DemoRunner/Builds/Android/gradle/wrapper/LICENSE-for-gradlewrapper.txt) ([Apache 2.0](examples/DemoRunner/Builds/Android/gradle/wrapper/LICENSE-for-gradlewrapper.txt))
-

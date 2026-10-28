@@ -1,6 +1,8 @@
 #include "Editor.h"
+#include "BinaryData.h"
 using namespace juce;
 ChoirEditor::ChoirEditor(ChoirProcessor& processor):AudioProcessorEditor(processor),p(processor){
+ brandLogo=Drawable::createFromImageData(NooriBrand::NOORI_svg,NooriBrand::NOORI_svgSize);
  setLookAndFeel(&look);
  const char* ids[]={"voices","detune","timing","width","mix","gain"};
  const char* names[]={"LIVE VOICES","PITCH SPREAD","GRAIN VARIATION","LIVE WIDTH","LIVE BLEND","LIVE OUTPUT"};
@@ -61,8 +63,10 @@ void ChoirEditor::resized(){
 void ChoirEditor::paint(Graphics& g){
  g.fillAll(dark?Colour(0xff102421):Colour(0xffedf4ee));g.addTransform(AffineTransform::scale(float(scale)));
  const auto text=dark?Colour(0xffe9f3ef):Colour(0xff152c2a);g.setColour(text);
- if(logo.isValid())g.drawImageWithin(logo,28,22,200,70,RectanglePlacement::centred,false);
- else {g.setFont(36.f);g.drawText("NOORI",28,22,200,48,Justification::centredLeft);}
+ g.setColour(Colours::white);g.fillRoundedRectangle(28,20,200,76,8);
+ if(logo.isValid())g.drawImageWithin(logo,38,24,180,68,RectanglePlacement::centred,false);
+ else if(brandLogo)brandLogo->drawWithin(g,Rectangle<float>(38,24,180,68),RectanglePlacement::centred,1.f);
+ else {g.setColour(Colours::black);g.setFont(36.f);g.drawText("NOORI",38,22,180,48,Justification::centredLeft);}
  g.setFont(27.f);g.drawText("CHOIR",248,26,320,40,Justification::centredLeft);
  g.setFont(14.f);g.drawText("Eight voices. One performance.",248,70,420,24,Justification::centredLeft);
  g.setColour(dark?Colour(0xff1b3430):Colour(0xffdceae0));g.fillRoundedRectangle(28,140,920,190,12);

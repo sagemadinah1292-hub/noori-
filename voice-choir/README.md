@@ -19,7 +19,7 @@ Import and export use a background worker. Cancel removes incomplete output; an 
 
 Select Light/Dark and 100%/200%/300%. These settings and processing controls are saved in host plugin state. The largest logical editor is 2940 × 1980; host DPI scaling can increase its physical size further, so it may exceed a monitor.
 
-No supplied NOORI logo asset was present in the source branch or workspace. The NOORI text is a fallback, not a claim to reproduce that asset. **Load NOORI logo…** displays a user-selected PNG/JPEG with preserved aspect ratio. Its local path is saved; the file must remain available on that computer. Bundling the approved asset remains pending.
+The existing NOORI vector logo from the repository’s tempo branch is bundled and displayed on a light plate in both themes. Its original path geometry is retained. **Load NOORI logo…** optionally displays a user-selected PNG/JPEG with preserved aspect ratio. A custom logo’s local path is saved; that file must remain available on that computer. The bundled vector requires no external file.
 
 ## Live insert
 
