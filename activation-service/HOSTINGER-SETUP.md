@@ -85,3 +85,18 @@ require online validation; full-key offline policy is optional and defaults off.
   activation/expiry times. Retain them only as needed for your friends' access.
 - If unavailable, the plugin preserves dry track audio. Licensed features stop when
   the current online lease ends; a network failure never deletes generated audio.
+
+## Public welcome page
+
+The public directory includes a responsive NOORI welcome page with the supplied
+white logo, plugin registration instructions and FAQs. Apache's DirectoryIndex
+selects index.html, while the existing PHP API endpoints continue to use index.php.
+The page can be displayed before the private database service is configured.
+It does not accept serials or register computers in a web browser.
+
+For the welcome page alone, upload and extract NOORI-Page-Only.zip inside this
+domain's public_html/noori-activation folder. The ZIP includes index.html, assets,
+and the standard activation-directory .htaccess. Back up an existing custom
+.htaccess before replacing it. It contains no owner portal, API implementation,
+configuration, credentials or private signing keys. Complete the full service
+setup above before using Owner sign in or distributing the protected plugin.

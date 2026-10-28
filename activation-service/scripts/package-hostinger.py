@@ -8,10 +8,19 @@ with zipfile.ZipFile(output / 'NOORI-Activation-Hostinger.zip', 'w', zipfile.ZIP
         for source in (root / folder).iterdir():
             if not source.is_file():
                 continue
-            if source.name not in {'bootstrap.php','index.php','admin.php','setup.php','.htaccess',
+            if source.name not in {'bootstrap.php','index.php','index.html','admin.php','setup.php','.htaccess',
                                    'service.php','schema.mysql.sql','config.example.php'}:
                 continue
             archive.write(source, target + '/' + source.name)
+    for source in (root / 'php/public/assets').iterdir():
+        if source.is_file() and source.name in {'site.css', 'noori-logo.svg'}:
+            archive.write(source, 'noori-activation/assets/' + source.name)
     archive.write(root / 'HOSTINGER-SETUP.md', 'HOSTINGER-SETUP.md')
     archive.write(root / 'README.md', 'README.md')
 print('Created hosting source bundle; no production credentials or private signing key included.')
+
+with zipfile.ZipFile(output / 'NOORI-Page-Only.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
+    public = root / 'php/public'
+    for name in ['index.html', '.htaccess', 'assets/site.css', 'assets/noori-logo.svg']:
+        archive.write(public / name, name)
+print('Created page-only ZIP for an existing noori-activation folder; API/config files are not included.')

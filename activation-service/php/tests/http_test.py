@@ -11,7 +11,7 @@ with tempfile.TemporaryDirectory(prefix='noori-php-http-') as temp:
     (temp/'clear.php').write_text("<?php $p=new PDO(getenv('NOORI_TEST_DSN'),getenv('NOORI_TEST_USER'),getenv('NOORI_TEST_PASSWORD'));$p->exec('DELETE FROM noori_licenses;DELETE FROM noori_rate_limits');")
     subprocess.run(['php',str(temp/'clear.php')],check=True)
     router=temp/'router.php'
-    router.write_text("<?php $_SERVER['HTTPS']=str_starts_with($_SERVER['REQUEST_URI'],'/__insecure')?'off':'on';$p=parse_url($_SERVER['REQUEST_URI'],PHP_URL_PATH);if(str_starts_with($p,'/__insecure'))$p=substr($p,11);$name=in_array($p,['/admin.php','/setup.php'])?basename($p):'index.php';if(!in_array($p,['/admin.php','/setup.php','/v1/activate','/v1/check','/health'])){http_response_code(404);exit;}require "+repr(str(public)).replace('\\','/')+".'/'.$name;")
+    router.write_text("<?php $_SERVER['HTTPS']=str_starts_with($_SERVER['REQUEST_URI'],'/__insecure')?'off':'on';$p=parse_url($_SERVER['REQUEST_URI'],PHP_URL_PATH);if(str_starts_with($p,'/__insecure'))$p=substr($p,11);$name=in_array($p,['/admin.php','/setup.php'])?basename($p):'index.php';if(in_array($p,['/','/index.html','/assets/site.css','/assets/noori-logo.svg'])){$file=$p==='/'?'index.html':ltrim($p,'/');$types=['html'=>'text/html','css'=>'text/css','svg'=>'image/svg+xml'];header('Content-Type: '.$types[pathinfo($file,PATHINFO_EXTENSION)]);readfile("+repr(str(public)).replace('\\','/')+".'/'.$file);exit;}if(!in_array($p,['/admin.php','/setup.php','/v1/activate','/v1/check','/health'])){http_response_code(404);exit;}require "+repr(str(public)).replace('\\','/')+".'/'.$name;")
     sock=socket.socket();sock.bind(('127.0.0.1',0));port=sock.getsockname()[1];sock.close()
     log=open(temp/'php.log','w+')
     server=subprocess.Popen(['php','-S',f'127.0.0.1:{port}',str(router)],cwd=public,stdout=log,stderr=log)
@@ -36,6 +36,9 @@ with tempfile.TemporaryDirectory(prefix='noori-php-http-') as temp:
             try:call('/health');break
             except OSError:time.sleep(.05)
         else:raise AssertionError('PHP server did not start')
+        status,headers,data=call('/');assert status==200 and b'NOORI CHOIR' in data and b'Registration / Trial' in data,'Public landing page works before service setup'
+        for asset,content_type in [('/assets/site.css','text/css'),('/assets/noori-logo.svg','image/svg+xml')]:
+            status,headers,data=call(asset);assert status==200 and headers['Content-Type'].startswith(content_type) and len(data)>100,'Branded local assets served'
         status,_,_=call('/__insecure/admin.php');assert status==403,'HTTPS required'
         status,_,_=call('/setup.php',{'token':'wrong','password':password});assert not (private/'installed.marker').exists(),'Setup token enforced'
         status,_,data=call('/setup.php',{'token':token,'password':password});assert status==200 and (private/'installed.marker').exists(),'First setup completes'
