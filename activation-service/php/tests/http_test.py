@@ -24,9 +24,9 @@ with tempfile.TemporaryDirectory(prefix='noori-php-http-') as temp:
         if fields is not None:
             import urllib.parse
             raw=urllib.parse.urlencode(fields);content_type='application/x-www-form-urlencoded'
-        if raw is not None:headers['Content-Type']=content_type or 'application/json'
+        if raw is not None:headers['content-type']=content_type or 'application/json'
         connection.request('POST' if raw is not None else 'GET',path,body=raw,headers=headers)
-        response=connection.getresponse();data=response.read();result=(response.status,dict(response.getheaders()),data)
+        response=connection.getresponse();data=response.read();result=(response.status,{name.lower():value for name,value in response.getheaders()},data)
         connection.close();return result
     def csrf(data):
         match=re.search(rb'name="csrf" value="([a-f0-9]+)"',data)
@@ -38,20 +38,20 @@ with tempfile.TemporaryDirectory(prefix='noori-php-http-') as temp:
         else:raise AssertionError('PHP server did not start')
         status,headers,data=call('/');assert status==200 and b'NOORI CHOIR' in data and b'Registration / Trial' in data,'Public landing page works before service setup'
         for asset,content_type in [('/assets/site.css','text/css'),('/assets/noori-logo.svg','image/svg+xml')]:
-            status,headers,data=call(asset);assert status==200 and headers['Content-Type'].startswith(content_type) and len(data)>100,'Branded local assets served'
+            status,headers,data=call(asset);assert status==200 and headers['content-type'].startswith(content_type) and len(data)>100,'Branded local assets served'
         status,_,_=call('/__insecure/admin.php');assert status==403,'HTTPS required'
         status,_,_=call('/setup.php',{'token':'wrong','password':password});assert not (private/'installed.marker').exists(),'Setup token enforced'
         status,_,data=call('/setup.php',{'token':token,'password':password});assert status==200 and (private/'installed.marker').exists(),'First setup completes'
         assert call('/setup.php')[0]==403,'Setup cannot run twice'
         status,_,data=call('/health');assert status==200 and json.loads(data)['activationReady'],'Ready health'
         status,headers,data=call('/admin.php');assert status==200
-        cookie=headers['Set-Cookie'].split(';')[0];assert 'secure' in headers['Set-Cookie'].lower() and 'httponly' in headers['Set-Cookie'].lower() and 'samesite=strict' in headers['Set-Cookie'].lower(),'Secure owner session'
+        cookie=headers['set-cookie'].split(';')[0];assert 'secure' in headers['set-cookie'].lower() and 'httponly' in headers['set-cookie'].lower() and 'samesite=strict' in headers['set-cookie'].lower(),'Secure owner session'
         first_csrf=csrf(data)
         assert call('/admin.php',{'csrf':'wrong','action':'login','password':password})[0]==403,'CSRF enforced'
         status,headers,data=call('/admin.php',{'csrf':first_csrf,'action':'login','password':password});assert status==200 and b'Generate invitations' in data,'Owner login'
-        cookie=headers.get('Set-Cookie',cookie).split(';')[0];current_csrf=csrf(data)
+        cookie=headers.get('set-cookie',cookie).split(';')[0];current_csrf=csrf(data)
         status,headers,data=call('/admin.php',{'csrf':current_csrf,'action':'generate','count':'20','kind':'trial','email':''})
-        assert status==200 and headers.get('Content-Type','').startswith('text/csv'),'CSV generation'
+        assert status==200 and headers.get('content-type','').startswith('text/csv'),'CSV generation'
         keys=list(csv.DictReader(io.StringIO(data.decode())));assert len(keys)==20 and len({x['Serial'] for x in keys})==20,'20 unique keys downloaded'
         status,_,page=call('/admin.php');assert all(k['Serial'].encode() not in page for k in keys),'Full keys not shown in owner list'
         assert call('/admin.php',{'csrf':current_csrf,'action':'generate','count':'20','kind':'trial'})[0]==403,'Old form cannot replay key generation'
