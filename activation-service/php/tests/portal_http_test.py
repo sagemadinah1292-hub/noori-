@@ -107,7 +107,7 @@ with tempfile.TemporaryDirectory(prefix='noori-portal-apache-') as tmp:
         _,_,page=friend.call(base+'/change-password.php');assert friend.call(base+'/change-password.php',{'csrf':csrf(page),'current':'Friend-password-123!','password':'New-password-456!','confirm':'New-password-456!'})[0]==200
         assert second.call(base+'/download.php?file=installer')[0]==303,'Password change revokes other web sessions'
         # Owner can revoke an invitation after login; a copied download link does not bypass it.
-        _,_,page=owner.call(base+'/admin.php');record=re.search(rb'name="id" value="([a-f0-9-]{36})".*?<button name="action" value="full"',page,re.S);assert record
+        _,_,page=owner.call(base+'/admin.php');record=re.search(rb'name="id" value="([a-f0-9-]{36})".*?<button name="action" value="full"',page.split(b'<h2>Registered keys</h2>',1)[1],re.S);assert record
         assert owner.call(base+'/admin.php',{'csrf':csrf(page),'action':'revoke','id':record[1].decode()})[0]==200
         assert friend.call(base+'/download.php?file=installer')[0]==403,'Owner disable blocks signed-in downloader'
         print('PASS real Apache/PHP portal: registration/login, private downloads, legacy URL/archive denial, CSRF, session invalidation, revocation and reversible root cleanup with secret preservation')

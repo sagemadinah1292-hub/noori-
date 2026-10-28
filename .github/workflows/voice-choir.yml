@@ -37,7 +37,16 @@ jobs:
           php-version: '8.3'
           extensions: pdo_mysql, pdo_sqlite, openssl
       - name: PHP syntax checks
-        run: rg --files activation-service/php -g '*.php' -0 | xargs -0 -n1 php -l
+        run: |
+          python3 - <<'PYLINT'
+          from pathlib import Path
+          import subprocess
+          files=sorted(Path('activation-service/php').rglob('*.php'))
+          assert files, 'No PHP sources found'
+          for path in files:
+              subprocess.run(['php','-l',str(path)],check=True)
+          print('Checked',len(files),'PHP source files')
+          PYLINT
       - name: Test PHP service with MySQL
         env:
           NOORI_TEST_DSN: 'mysql:host=127.0.0.1;port=3306;dbname=noori_test;charset=utf8mb4'
