@@ -110,6 +110,15 @@ jobs:
       - name: Compile and test Windows installer
         shell: pwsh
         run: ./voice-choir/scripts/BuildInstaller.ps1
+      - name: Bundle website with tested plugin downloads
+        shell: pwsh
+        run: python activation-service/scripts/package-website.py --installer dist-choir/NOORI_CHOIR_Setup_x64.exe --vst3-package dist-choir/Noori-Choir-0.4.0-Windows-x64.zip --build-info dist-choir/Noori-Choir-0.4.0-Windows-x64/BUILD-INFO.json --installer-tests dist-choir/INSTALLER-TEST-RESULTS.json --preview build-choir/Preview-Results.png
+      - name: Upload website with plugin downloads
+        uses: actions/upload-artifact@v4
+        with:
+          name: NOORI-Website-With-Plugin
+          path: dist-activation/NOORI-Website-With-Plugin.zip
+          if-no-files-found: error
       - name: Upload installer and test evidence
         uses: actions/upload-artifact@v4
         with:

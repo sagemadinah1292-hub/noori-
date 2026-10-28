@@ -100,3 +100,25 @@ and the standard activation-directory .htaccess. Back up an existing custom
 .htaccess before replacing it. It contains no owner portal, API implementation,
 configuration, credentials or private signing keys. Complete the full service
 setup above before using Owner sign in or distributing the protected plugin.
+
+## Website with actual plugin downloads
+
+Use **NOORI-Website-With-Plugin.zip** when you want the installer and VST3 archive
+hosted on your own website. Upload and extract its contents directly inside
+`public_html/noori-activation/`: `index.html`, `.htaccess`, `assets/`, and
+`downloads/` belong at that level, not inside another nested folder. Back up an
+existing custom `.htaccess` before replacement. Existing PHP service/config files
+are not included or overwritten. The welcome-page-only ZIP does not include binaries.
+
+This package includes the real installer, VST3 plus project sources, the actual
+plugin screenshot, installation instructions, SHA-256 checksums and build evidence.
+The download buttons use relative local file URLs; friends do not need GitHub
+accounts. The current owner development build explicitly says that serial/trial
+enforcement is disabled. It must not be described as the protected trial installer.
+The live activation backend and its public signing key are still required for that.
+
+Actions builds this complete package after all Windows tests and the installer
+smoke test pass, and uploads it as `NOORI-Website-With-Plugin`. For a local package
+using existing tested artifacts, run `scripts/package-website.py --help`.
+Public metadata uses `.txt` filenames because the activation directory blocks
+public access to `.json` files. No private keys or live credentials go in downloads.
