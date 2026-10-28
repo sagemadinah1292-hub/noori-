@@ -8,3 +8,7 @@ RewriteRule ^(?:v1/(?:activate|check)|health)/?$ index.php [L]
 <FilesMatch "^(?:bootstrap|portal-bootstrap|config)\.php$">
   Require all denied
 </FilesMatch>
+
+<FilesMatch "(?i)\.(?:exe|zip|vst3|dll)$">
+  Require all denied
+</FilesMatch>

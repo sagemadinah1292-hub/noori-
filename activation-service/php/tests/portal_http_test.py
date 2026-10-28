@@ -36,7 +36,7 @@ with tempfile.TemporaryDirectory(prefix='noori-portal-apache-') as tmp:
     subprocess.run(['php',str(tmp/'clear.php')],check=True)
     backend_port=port();apache_port=port();logs=[];processes=[]
     router=tmp/'router.php'
-    router.write_text("<?php $_SERVER['HTTPS']='on';$route=parse_url($_SERVER['REQUEST_URI'],PHP_URL_PATH);$name=basename($route);$allowed=['index.php','home.php','login.php','register.php','dashboard.php','download.php','logout.php','change-password.php','reset-password.php','setup.php','admin.php','secure-downloads.php'];if(!in_array($name,$allowed)){http_response_code(404);exit;}$original=explode(' ',$_SERVER['HTTP_X_NOORI_TEST_REQUEST']??'');if(isset($original[1]))$_SERVER['REQUEST_URI']=$original[1];$_SERVER['SCRIPT_NAME']='/noori-activation/'.$name;require "+repr(str(app))+".'/'.$name;")
+    router.write_text("<?php $_SERVER['HTTPS']='on';$route=parse_url($_SERVER['REQUEST_URI'],PHP_URL_PATH);$name=basename($route);$allowed=['index.php','home.php','login.php','register.php','create-password.php','account.php','dashboard.php','download.php','logout.php','change-password.php','reset-password.php','setup.php','admin.php','secure-downloads.php'];if(!in_array($name,$allowed)){http_response_code(404);exit;}$original=explode(' ',$_SERVER['HTTP_X_NOORI_TEST_REQUEST']??'');if(isset($original[1]))$_SERVER['REQUEST_URI']=$original[1];$_SERVER['SCRIPT_NAME']='/noori-activation/'.$name;require "+repr(str(app))+".'/'.$name;")
     backend_log=open(tmp/'php.log','w+');logs.append(backend_log)
     processes.append(subprocess.Popen(['php','-S',f'127.0.0.1:{backend_port}',str(router)],cwd=app,stdout=backend_log,stderr=backend_log))
     # This test-only proxy rule runs after the shipped deny and route rules.
@@ -74,21 +74,36 @@ with tempfile.TemporaryDirectory(prefix='noori-portal-apache-') as tmp:
         (public/'bootstrap.php').write_text('<?php function nooriService(){}')
         (public/'index.php').write_text('<?php nooriService();')
         (public/'default.php').write_text('HOSTINGER_UNRELATED');(public/'llms.txt').write_text('UNCHANGED');(public/'.private').mkdir();(public/'.htaccess').write_text('Options -Indexes\nDirectoryIndex index.html\n')
-        status,headers,page=anonymous.call(base+'/');assert status==200 and b'Create my account' in page and b'downloads/NOORI_CHOIR' not in page,'Public home has account access, no direct installer link'
+        (public/'unlisted-copy.zip').write_bytes(b'UNLISTED_COPY')
+        status,headers,page=anonymous.call(base+'/');assert status==200 and b'Create my account' in page and b'Owner sign in' not in page and b'downloads/NOORI_CHOIR' not in page,'Public home has account access, no direct installer link'
         assert anonymous.call(base+'/downloads/NOORI_CHOIR_Setup_x64.exe')[0]==403,'Apache denies legacy public download path'
         assert anonymous.call(base+'/downloads.5773/NOORI_CHOIR_Setup_x64.exe')[0] in [403,404],'Apache denies suffixed download folders'
         assert anonymous.call(base+'/NOORI-Website-With-Plugin.zip')[0]==403,'Apache denies uploaded website archive'
         assert anonymous.call(base+'/bootstrap.php')[0]==403,'Apache denies helper source'
         assert anonymous.call(base+'/download.php?file=installer')[0]==303,'Anonymous file endpoint requires sign-in'
         assert anonymous.call(base+'/dashboard.php')[0]==303,'Anonymous account endpoint requires sign-in'
-        status,headers,page=owner.call(base+'/admin.php');status,headers,page=owner.call(base+'/admin.php',{'csrf':csrf(page),'action':'login','password':password});assert status==200 and b'Generate invitations' in page,'Owner sign-in preserved'
+        assert owner.call(base+'/admin.php')[0]==303,'Owner route redirects to common sign-in'
+        status,headers,page=owner.call(base+'/login.php')
+        status,headers,page=owner.call(base+'/login.php',{'csrf':csrf(page),'email':'owner','password':password});assert status==303 and headers['location']=='admin.php','Owner login selects owner dashboard'
+        status,headers,page=owner.call(base+'/admin.php');assert status==200 and b'owner dashboard' in page and b'Generate invitations' in page,'Owner full controls'
+        assert owner.call(base+'/download.php?file=installer')[2]==installer,'Owner has full download access without a friend invitation'
+        assert anonymous.call('/NOORI-Website-With-Plugin.zip')[0]==403 and anonymous.call('/downloads/NOORI_CHOIR_Setup_x64.exe')[0]==403,'Root public downloads blocked automatically on owner login before cleanup'
+        assert anonymous.call('/unlisted-copy.zip')[0]==403,'Unknown public ZIP filename cannot bypass the root block'
         status,_,csv_body=owner.call(base+'/admin.php',{'csrf':csrf(page),'action':'generate','count':'1','kind':'trial','email':'friend@example.com'});assert status==200
         key=list(csv.DictReader(io.StringIO(csv_body.decode())))[0]['Serial']
         status,headers,page=friend.call(base+'/register.php');assert status==200 and 'secure' in headers['set-cookie'].lower(),'Secure friend cookie'
         assert friend.call(base+'/register.php',{'csrf':'bad','email':'friend@example.com','serial':key,'password':'Friend-password-123!','confirm':'Friend-password-123!'})[0]==403,'Signup CSRF'
-        fields={'csrf':csrf(page),'email':'friend@example.com','serial':key,'password':'Friend-password-123!','confirm':'Friend-password-123!'}
-        status,headers,_=friend.call(base+'/register.php',fields);assert status==303 and headers['location']=='dashboard.php','Invitation signup'
-        status,_,page=friend.call(base+'/dashboard.php');assert status==200 and b'Ready to activate' in page and b'Starts on first plugin activation' in page,'Account dashboard'
+        fields={'csrf':csrf(page),'email':'friend@example.com','serial':key}
+        status,headers,_=friend.call(base+'/register.php',fields);assert status==303 and headers['location']=='create-password.php','Registration details lead to password step'
+        assert friend.call(base+'/download.php?file=installer')[0]==303,'Step one alone does not authorize downloads'
+        assert friend.call(base+'/admin.php')[0]==303,'Pending registration is not an owner session'
+        assert anonymous.call(base+'/create-password.php')[0]==303,'Password step requires verified registration details'
+        status,_,page=friend.call(base+'/create-password.php');assert status==200 and b'STEP 2 OF 2' in page and key.encode() not in page,'Password step contains no raw serial'
+        status,headers,_=friend.call(base+'/create-password.php',{'csrf':csrf(page),'password':'Friend-password-123!','confirm':'Friend-password-123!','role':'owner'});assert status==303 and headers['location']=='dashboard.php','Completed registration selects user dashboard, ignoring forged role'
+        assert friend.call(base+'/admin.php')[0]==403 and friend.call(base+'/secure-downloads.php')[0]==403,'User cannot open owner pages'
+        _,_,user_page=friend.call(base+'/dashboard.php')
+        assert friend.call(base+'/admin.php',{'csrf':csrf(user_page),'action':'generate','count':'20','kind':'full'})[0]==403,'User cannot execute owner actions with their own valid CSRF token'
+        status,_,page=friend.call(base+'/dashboard.php');assert status==200 and b'Ready to activate' in page and b'Starts on first plugin activation' in page and b'Generate invitations' not in page and b'Owner dashboard' not in page,'Limited user dashboard'
         assert key.encode() not in page,'Raw serial never exposed in dashboard'
         status,headers,data=friend.call(base+'/download.php?file=installer');assert status==200 and data==installer and 'private' in headers['cache-control'] and 'no-store' in headers['cache-control'],'Authenticated private installer streaming'
         assert friend.call(base+'/download.php?file=../../config.php')[0]==404,'Download allowlist blocks traversal'

@@ -43,7 +43,7 @@ version=str(info['version'])
 if info.get('licensing_enforced') is not True:
     raise SystemExit('The final portal only publishes protected plugin builds.')
 if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+',version):raise SystemExit('Unexpected release version.')
-public_names=['index.php','index.html','home.php','login.php','register.php','dashboard.php','download.php','logout.php','change-password.php','reset-password.php','secure-downloads.php','portal-bootstrap.php','admin.php','.htaccess','assets/site.css','assets/noori-logo.svg']
+public_names=['index.php','index.html','home.php','login.php','account.php','register.php','create-password.php','dashboard.php','download.php','logout.php','change-password.php','reset-password.php','secure-downloads.php','portal-bootstrap.php','admin.php','.htaccess','assets/site.css','assets/noori-logo.svg']
 public_files={name:(public/name).read_bytes() for name in public_names}
 if args.preview:
     preview=args.preview.read_bytes()
@@ -96,16 +96,24 @@ guide="""NOORI FINAL PORTAL UPGRADE — preserve your existing setup
 3. Upload/extract NOORI-Final-Public-Upgrade.zip INSIDE
    public_html/noori-activation. It adds the account pages and updates the owner
    page and .htaccess. Your already configured bootstrap.php is not replaced.
-4. Open /noori-activation/admin.php and sign in with your existing owner password.
-   Open Review and secure the website upgrade (secure-downloads.php).
+4. Open the normal website and choose Sign in. Owner ID is "owner" by default;
+   use the EXISTING owner password from setup. This opens the OWNER dashboard.
+   Friend email/password opens a separate USER dashboard. Old browser sessions
+   need to sign in again after this update; passwords/keys are not reset.
+   Opening the owner dashboard installs the root public-file download block,
+   preserving a private backup of the previous .htaccess. If it reports an error,
+   resolve it before sharing the portal. Website management contains the backup/
+   cleanup controls; no separate upgrade link needs to be given to visitors.
 5. Review the exact public-file list and apply the upgrade. Identified old NOORI
    public installers, ZIPs, duplicate assets and root PHP copies move into a dated
    private backup. Nothing is deleted. Unrelated .private, default.php and llms.txt
    are preserved. The root .htaccess is backed up and receives a NOORI archive guard.
    Resolve any reported errors before allowing friends to download.
 6. Generate ONE trial invitation assigned to your own email. Keep its CSV private.
-   Use an incognito window: Create account with email, serial and a new password;
-   sign in; download the installer. Keep the invitation for plugin activation.
+   Use an incognito window: register email + serial, continue to Create password,
+   then finish registration. The authenticated USER dashboard opens. A partial
+   registration does not grant download access. Keep the original invitation
+   for plugin activation.
 7. While signed out verify dashboard.php and download.php?file=installer ask for
    sign-in. Old /downloads/...exe and NOORI-Website-With-Plugin.zip links at BOTH
    the domain root and /noori-activation must return 403 or 404.
@@ -127,8 +135,8 @@ public_html/
   .htaccess (existing rules plus managed NOORI guard)
   index.html (redirect to /noori-activation if an old NOORI homepage was found)
   noori-activation/
-    index.php, index.html (redirect), home.php, login.php, register.php
-    dashboard.php, download.php, logout.php, change-password.php, reset-password.php
+    index.php, index.html (redirect), home.php, login.php, account.php
+    register.php, create-password.php, dashboard.php, download.php, logout.php, change-password.php, reset-password.php
     admin.php, secure-downloads.php, portal-bootstrap.php, bootstrap.php, .htaccess
     assets/
 
@@ -146,5 +154,6 @@ def archive(name,files):
 pub=archive('NOORI-Final-Public-Upgrade.zip',public_files)
 priv=archive('NOORI-Final-Private-Upgrade.zip',private_files)
 (args.output/'NOORI-FINAL-UPLOAD-GUIDE.txt').write_text(guide,encoding='utf-8')
+(args.output/'NOORI-EMERGENCY-DOWNLOAD-GUARD.txt').write_text('<FilesMatch \"(?i)\\.(?:exe|zip|vst3|dll)$\">\n  Require all denied\n</FilesMatch>\n',encoding='utf-8')
 print('Created',pub,'and',priv,'with protected private payloads.')
 print('Public ZIP contains no installer, serial, production config or private signing key.')

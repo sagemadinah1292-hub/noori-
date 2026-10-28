@@ -1,10 +1,10 @@
 <?php
 declare(strict_types=1);
 require __DIR__.'/portal-bootstrap.php';
-if(!$friend)nooriRedirect('login.php');
+if(!$friend&&!nooriOwner())nooriRedirect('login.php');
 try{
  if(!in_array($_SERVER['REQUEST_METHOD'],['GET','HEAD'],true))throw new NooriError(405,'Use GET.');
- if(!NooriPortal::mayDownload($friend,time()))throw new NooriError(403,'Your download access is unavailable. Contact NOORI.');
+ if(!nooriOwner()&&!NooriPortal::mayDownload($friend,time()))throw new NooriError(403,'Your download access is unavailable. Contact NOORI.');
  $allowed=['installer'=>['NOORI_CHOIR_Setup_x64.exe','application/octet-stream'],'vst3'=>['NOORI-CHOIR-Windows-x64.zip','application/zip'],'guide'=>['INSTALLATION.txt','text/plain; charset=utf-8'],'checksums'=>['SHA256SUMS.txt','text/plain; charset=utf-8']];
  $id=(string)($_GET['file']??'');if(!isset($allowed[$id]))throw new NooriError(404,'Download not found.');
  $downloads=nooriDownloads();[$name,$type]=$allowed[$id];$path=realpath($downloads['directory'].'/'.$name);

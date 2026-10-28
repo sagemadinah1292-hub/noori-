@@ -14,15 +14,25 @@ final class NooriPortal {
  }
  private function locked(string $sql):string {return $sql.($this->db->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql'?' FOR UPDATE':'');}
  private static function password(string $value):void {if(strlen($value)<12||strlen($value)>72)throw new NooriError(400,'Choose a password between 12 and 72 bytes.');}
- public function register(string $inputEmail,string $password,string $serial,int $now):array {
-  $email=NooriService::email($inputEmail);self::password($password);$serial=strtoupper(trim($serial));
+ public function invitation(string $inputEmail,string $serial,int $now):array {
+  $email=NooriService::email($inputEmail);$serial=strtoupper(trim($serial));
   if($email===null||!preg_match('/^NOORI-[TF]-[A-F0-9]{32}$/D',$serial))throw new NooriError(400,'Enter your email and a valid NOORI invitation key.');
+  $hash=hash('sha256',$serial);$s=$this->db->prepare('SELECT * FROM noori_licenses WHERE key_hash=?');$s->execute([$hash]);$license=$s->fetch();
+  self::validInvitation($license,$email,$now);
+  return ['email'=>$email,'key_hash'=>$hash,'license_id'=>$license['id'],'expires'=>$now+600];
+ }
+ private static function validInvitation(array|false $license,string $email,int $now):void {
+  if(!$license||($license['email']!==null&&$license['email']!==$email)||(int)$license['revoked']!==0||($license['kind']==='trial'&&$license['expires_at']!==null&&(int)$license['expires_at']<=$now))throw new NooriError(403,'This invitation is unavailable for this email. Contact NOORI.');
+ }
+ public function register(string $inputEmail,string $password,string $serial,int $now):array {return $this->completeRegistration($this->invitation($inputEmail,$serial,$now),$password,$now);}
+ public function completeRegistration(array $proof,string $password,int $now):array {
+  self::password($password);$email=NooriService::email($proof['email']??null);
+  if($email===null||!is_string($proof['key_hash']??null)||!preg_match('/^[a-f0-9]{64}$/D',$proof['key_hash'])||(int)($proof['expires']??0)<=$now)throw new NooriError(403,'Registration details expired. Please start again.');
   $passwordHash=password_hash($password,PASSWORD_DEFAULT);$this->db->beginTransaction();
   try{
-   $s=$this->db->prepare($this->locked('SELECT * FROM noori_licenses WHERE key_hash=?'));$s->execute([hash('sha256',$serial)]);$license=$s->fetch();
-   if(!$license||($license['email']!==null&&$license['email']!==$email)||(int)$license['revoked']!==0||($license['kind']==='trial'&&$license['expires_at']!==null&&(int)$license['expires_at']<=$now))throw new NooriError(403,'This invitation is unavailable for this email. Contact NOORI.');
+   $s=$this->db->prepare($this->locked('SELECT * FROM noori_licenses WHERE key_hash=?'));$s->execute([$proof['key_hash']]);$license=$s->fetch();self::validInvitation($license,$email,$now);
+   if($license['id']!==($proof['license_id']??''))throw new NooriError(403,'Registration details are invalid.');
    $id=NooriService::uuid();$s=$this->db->prepare('INSERT INTO noori_accounts(id,email,password_hash,license_id,created_at) VALUES(?,?,?,?,?)');$s->execute([$id,$email,$passwordHash,$license['id'],$now]);
-   // Reserve the email only. A browser never starts a trial or binds a Windows computer.
    $s=$this->db->prepare('UPDATE noori_licenses SET email=? WHERE id=?');$s->execute([$email,$license['id']]);
    $this->db->commit();return $this->account($id)??throw new RuntimeException('Account unavailable.');
   }catch(Throwable $e){if($this->db->inTransaction())$this->db->rollBack();if($e instanceof PDOException&&in_array((string)$e->getCode(),['23000','19'],true))throw new NooriError(409,'An account or trial already exists. Sign in or contact NOORI.');throw $e;}
@@ -59,28 +69,39 @@ final class NooriPortal {
  public function accounts():array {return $this->db->query('SELECT a.id,a.email,a.created_at,a.last_login_at,l.kind,l.revoked FROM noori_accounts a JOIN noori_licenses l ON l.id=a.license_id ORDER BY a.created_at DESC LIMIT 1000')->fetchAll();}
 }
 
-function nooriSession(string $name):void {
+function nooriSession():void {
  global $config;
- ini_set('session.use_strict_mode','1');ini_set('session.use_only_cookies','1');session_name($name);
+ ini_set('session.use_strict_mode','1');ini_set('session.use_only_cookies','1');session_name('noori_access');
  session_set_cookie_params(['secure'=>true,'httponly'=>true,'samesite'=>'Strict','path'=>(parse_url($config['public_url'],PHP_URL_PATH)?:'/')]);session_start();
  $_SESSION['csrf']??=bin2hex(random_bytes(32));
 }
 function nooriCsrf():void {if(!hash_equals($_SESSION['csrf']??'',(string)($_POST['csrf']??'')))throw new NooriError(403,'This form expired. Reload the page and try again.');}
 function nooriAccount(NooriPortal $portal):?array {
- if(!isset($_SESSION['friend_id']))return null;
+ if(($_SESSION['role']??'')!=='friend'||!isset($_SESSION['friend_id']))return null;
  if(time()-(int)($_SESSION['friend_seen']??0)>1800||time()-(int)($_SESSION['friend_since']??0)>43200){unset($_SESSION['friend_id']);return null;}
  $user=$portal->account((string)$_SESSION['friend_id']);
  if(!$user||(int)$user['auth_version']!==(int)($_SESSION['friend_version']??0)){unset($_SESSION['friend_id']);return null;}
  $_SESSION['friend_seen']=time();return $user;
 }
-function nooriSignIn(array $user):void {session_regenerate_id(true);$_SESSION['friend_id']=$user['id'];$_SESSION['friend_version']=(int)$user['auth_version'];$_SESSION['friend_since']=$_SESSION['friend_seen']=time();$_SESSION['csrf']=bin2hex(random_bytes(32));}
+function nooriSignIn(array $user):void {unset($_SESSION['owner'],$_SESSION['last_seen'],$_SESSION['owner_since'],$_SESSION['pending_registration']);session_regenerate_id(true);$_SESSION['role']='friend';$_SESSION['friend_id']=$user['id'];$_SESSION['friend_version']=(int)$user['auth_version'];$_SESSION['friend_since']=$_SESSION['friend_seen']=time();$_SESSION['csrf']=bin2hex(random_bytes(32));}
+function nooriOwner():bool {
+ if(($_SESSION['role']??'')!=='owner'||($_SESSION['owner']??false)!==true)return false;
+ if(time()-(int)($_SESSION['last_seen']??0)>1800||time()-(int)($_SESSION['owner_since']??0)>43200){unset($_SESSION['owner'],$_SESSION['role']);return false;}
+ $_SESSION['last_seen']=time();return true;
+}
+function nooriOwnerId():string {global $config;return strtolower(trim((string)($config['owner_login']??'owner')));}
+function nooriOwnerSignIn(string $password):void {
+ global $privateDir;$owner=json_decode((string)file_get_contents($privateDir.'/owner.json'),true,8,JSON_THROW_ON_ERROR);
+ if(!password_verify($password,$owner['password_hash']))throw new NooriError(403,'The login or password is incorrect.');
+ unset($_SESSION['friend_id'],$_SESSION['friend_version'],$_SESSION['pending_registration']);session_regenerate_id(true);$_SESSION['role']='owner';$_SESSION['owner']=true;$_SESSION['last_seen']=$_SESSION['owner_since']=time();$_SESSION['csrf']=bin2hex(random_bytes(32));
+}
 function nooriRedirect(string $path):never {header('Location: '.$path,true,303);exit;}
 function nooriFormToken():void {echo '<input type="hidden" name="csrf" value="'.esc($_SESSION['csrf']).'">';}
 function nooriPageStart(string $title,?array $user=null):void {
- ?><!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#0a3437"><title><?=esc($title)?> — NOORI CHOIR</title><link rel="stylesheet" href="assets/site.css"><link rel="icon" href="assets/noori-logo.svg" type="image/svg+xml"></head><body><a class="skip" href="#main">Skip to content</a><header class="site-header wrap"><a class="brand" href="./"><img src="assets/noori-logo.svg" width="104" height="55" alt="NOORI — Shahid Ul Haq"><span>CHOIR</span></a><nav aria-label="Main navigation"><a href="./">Home</a><?php if($user):?><a href="dashboard.php">My account</a><form method="post" action="logout.php"><?php nooriFormToken();?><button class="text-button">Sign out</button></form><?php else:?><a href="login.php">Sign in</a><a class="owner-link" href="register.php">Create account ↗</a><?php endif;?></nav></header><main id="main">
+ ?><!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#0a3437"><title><?=esc($title)?> — NOORI CHOIR</title><link rel="stylesheet" href="assets/site.css"><link rel="icon" href="assets/noori-logo.svg" type="image/svg+xml"></head><body><a class="skip" href="#main">Skip to content</a><header class="site-header wrap"><a class="brand" href="./"><img src="assets/noori-logo.svg" width="104" height="55" alt="NOORI — Shahid Ul Haq"><span>CHOIR</span></a><nav aria-label="Main navigation"><a href="./">Home</a><?php if($user||nooriOwner()):?><a href="account.php"><?=nooriOwner()?'Owner dashboard':'My account'?></a><form method="post" action="logout.php"><?php nooriFormToken();?><button class="text-button">Sign out</button></form><?php else:?><a href="login.php">Sign in</a><a class="owner-link" href="register.php">Create account ↗</a><?php endif;?></nav></header><main id="main">
  <?php
 }
-function nooriPageEnd():void {?></main><footer class="wrap site-footer"><p>NOORI CHOIR · Shared with friends.</p><a href="admin.php">Owner sign in ↗</a></footer></body></html><?php }
+function nooriPageEnd():void {?></main><footer class="wrap site-footer"><p>NOORI CHOIR · Shared with friends.</p><a href="account.php">My dashboard →</a></footer></body></html><?php }
 function nooriErrorText(Throwable $e):string {if($e instanceof NooriError){http_response_code($e->status);return $e->getMessage();}http_response_code(503);return 'The service is temporarily unavailable. Please contact NOORI.';}
 function nooriRate(NooriService $service,string $action,int $maximum=10):void {if(!$service->limit('portal:'.$action.':'.($_SERVER['REMOTE_ADDR']??'unknown'),$maximum,time()))throw new NooriError(429,'Too many attempts. Please wait one minute.');}
 function nooriDownloads():array {

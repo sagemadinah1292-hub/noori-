@@ -4,14 +4,14 @@ import base64,csv,http.client,io,json,os,re,shutil,socket,subprocess,tempfile,ti
 
 root=Path(__file__).resolve().parents[1]
 with tempfile.TemporaryDirectory(prefix='noori-php-http-') as temp:
-    temp=Path(temp);private=temp/'private';public=temp/'public';shutil.copytree(root/'private',private);shutil.copytree(root/'public',public)
+    temp=Path(temp);private=temp/'noori-private';public=temp/'public_html/noori-activation';public.parent.mkdir();shutil.copytree(root/'private',private);shutil.copytree(root/'public',public)
     bootstrap=public/'bootstrap.php';bootstrap.write_text(bootstrap.read_text().replace('/CHANGE_TO_YOUR_HOME_DIRECTORY/noori-private',str(private)))
     token='setup-test-'+'c'*64;password='Owner-test-password-123!'
     (private/'config.php').write_text("<?php return ['dsn'=>getenv('NOORI_TEST_DSN'),'db_user'=>getenv('NOORI_TEST_USER'),'db_password'=>getenv('NOORI_TEST_PASSWORD'),'public_url'=>'https://activation.test','setup_token'=>'"+token+"','access_policy'=>'online'];")
     (temp/'clear.php').write_text("<?php $p=new PDO(getenv('NOORI_TEST_DSN'),getenv('NOORI_TEST_USER'),getenv('NOORI_TEST_PASSWORD'));$p->exec('DELETE FROM noori_licenses;DELETE FROM noori_rate_limits');")
     subprocess.run(['php',str(temp/'clear.php')],check=True)
     router=temp/'router.php'
-    router.write_text("<?php $_SERVER['HTTPS']=str_starts_with($_SERVER['REQUEST_URI'],'/__insecure')?'off':'on';$p=parse_url($_SERVER['REQUEST_URI'],PHP_URL_PATH);if(str_starts_with($p,'/__insecure'))$p=substr($p,11);$name=in_array($p,['/admin.php','/setup.php'])?basename($p):'index.php';if(in_array($p,['/','/index.html','/assets/site.css','/assets/noori-logo.svg'])){$file=$p==='/'?'index.html':ltrim($p,'/');$types=['html'=>'text/html','css'=>'text/css','svg'=>'image/svg+xml'];header('Content-Type: '.$types[pathinfo($file,PATHINFO_EXTENSION)]);readfile("+repr(str(public)).replace('\\','/')+".'/'.$file);exit;}if(!in_array($p,['/admin.php','/setup.php','/v1/activate','/v1/check','/health'])){http_response_code(404);exit;}require "+repr(str(public)).replace('\\','/')+".'/'.$name;")
+    router.write_text("<?php $_SERVER['HTTPS']=str_starts_with($_SERVER['REQUEST_URI'],'/__insecure')?'off':'on';$p=parse_url($_SERVER['REQUEST_URI'],PHP_URL_PATH);if(str_starts_with($p,'/__insecure'))$p=substr($p,11);$name=in_array($p,['/admin.php','/setup.php','/login.php','/account.php'])?basename($p):'index.php';if(in_array($p,['/','/index.html','/assets/site.css','/assets/noori-logo.svg'])){$file=$p==='/'?'index.html':ltrim($p,'/');$types=['html'=>'text/html','css'=>'text/css','svg'=>'image/svg+xml'];header('Content-Type: '.$types[pathinfo($file,PATHINFO_EXTENSION)]);readfile("+repr(str(public)).replace('\\','/')+".'/'.$file);exit;}if(!in_array($p,['/admin.php','/setup.php','/login.php','/account.php','/v1/activate','/v1/check','/health'])){http_response_code(404);exit;}require "+repr(str(public)).replace('\\','/')+".'/'.$name;")
     sock=socket.socket();sock.bind(('127.0.0.1',0));port=sock.getsockname()[1];sock.close()
     log=open(temp/'php.log','w+')
     server=subprocess.Popen(['php','-S',f'127.0.0.1:{port}',str(router)],cwd=public,stdout=log,stderr=log)
@@ -44,12 +44,15 @@ with tempfile.TemporaryDirectory(prefix='noori-php-http-') as temp:
         status,_,data=call('/setup.php',{'token':token,'password':password});assert status==200 and (private/'installed.marker').exists(),'First setup completes'
         assert call('/setup.php')[0]==403,'Setup cannot run twice'
         status,_,data=call('/health');assert status==200 and json.loads(data)['activationReady'],'Ready health'
-        status,headers,data=call('/admin.php');assert status==200
-        cookie=headers['set-cookie'].split(';')[0];assert 'secure' in headers['set-cookie'].lower() and 'httponly' in headers['set-cookie'].lower() and 'samesite=strict' in headers['set-cookie'].lower(),'Secure owner session'
+        assert call('/admin.php')[0]==303,'Owner route uses unified sign-in'
+        status,headers,data=call('/login.php');assert status==200
+        cookie=headers['set-cookie'].split(';')[0];assert 'secure' in headers['set-cookie'].lower() and 'httponly' in headers['set-cookie'].lower() and 'samesite=strict' in headers['set-cookie'].lower(),'Secure shared session'
         first_csrf=csrf(data)
-        assert call('/admin.php',{'csrf':'wrong','action':'login','password':password})[0]==403,'CSRF enforced'
-        status,headers,data=call('/admin.php',{'csrf':first_csrf,'action':'login','password':password});assert status==200 and b'Generate invitations' in data,'Owner login'
-        cookie=headers.get('set-cookie',cookie).split(';')[0];current_csrf=csrf(data)
+        assert call('/login.php',{'csrf':'wrong','email':'owner','password':password})[0]==403,'CSRF enforced'
+        status,headers,data=call('/login.php',{'csrf':first_csrf,'email':'owner','password':password});assert status==303 and headers['location']=='admin.php','Owner role redirect'
+        cookie=headers.get('set-cookie',cookie).split(';')[0]
+        status,headers,data=call('/admin.php');assert status==200 and b'Generate invitations' in data,'Owner dashboard'
+        current_csrf=csrf(data)
         status,headers,data=call('/admin.php',{'csrf':current_csrf,'action':'generate','count':'20','kind':'trial','email':''})
         assert status==200 and headers.get('content-type','').startswith('text/csv'),'CSV generation'
         keys=list(csv.DictReader(io.StringIO(data.decode())));assert len(keys)==20 and len({x['Serial'] for x in keys})==20,'20 unique keys downloaded'

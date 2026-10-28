@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-require __DIR__.'/portal-bootstrap.php';if(!$friend)nooriRedirect('login.php');$message='';
+require __DIR__.'/portal-bootstrap.php';if(nooriOwner())nooriRedirect('admin.php');if(!$friend)nooriRedirect('login.php');$message='';
 if($_SERVER['REQUEST_METHOD']==='POST')try{nooriCsrf();nooriRate($service,'change-password',6);if(!hash_equals((string)($_POST['password']??''),(string)($_POST['confirm']??'')))throw new NooriError(400,'The passwords do not match.');$_SESSION['friend_version']=$portal->changePassword($friend['id'],(string)($_POST['current']??''),(string)($_POST['password']??''));session_regenerate_id(true);$_SESSION['csrf']=bin2hex(random_bytes(32));$message='Password updated. Other sessions have been signed out.';}catch(Throwable $e){$message=nooriErrorText($e);}
 nooriPageStart('Change password',$friend);
 ?>

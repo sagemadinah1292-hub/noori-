@@ -33,15 +33,31 @@ function nooriUpgradePlan(string $app,string $private):array {
  }
  ksort($items);return ['app'=>$app,'root'=>$root,'private'=>$private,'files'=>$items,'notes'=>$notes];
 }
+function nooriDownloadGuardBlock():string {
+ return <<<'GUARD'
+# BEGIN NOORI PRIVATE DOWNLOAD GUARD
+<FilesMatch "(?i)\.(?:exe|zip|vst3|dll)$">
+  Require all denied
+</FilesMatch>
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteRule ^(?:noori-activation/)?(?:downloads(?:\.[0-9]+)?/)?NOORI[^/]*\.(?:zip|exe)$ - [F,L,NC]
+</IfModule>
+# END NOORI PRIVATE DOWNLOAD GUARD
+GUARD;
+}
+function nooriInstallDownloadGuard(string $app,string $private):void {
+ [$app,$root,$private]=nooriUpgradePaths($app,$private);$path=$root.'/.htaccess';$original=is_file($path)?file_get_contents($path):'';
+ if($original===false)throw new NooriError(503,'Cannot read the root download protection file.');$guard=nooriDownloadGuardBlock();if(str_contains($original,$guard))return;
+ $backup=$private.'/guard-backup/'.gmdate('Ymd_His').'_'.bin2hex(random_bytes(4));if(!mkdir($backup,0700,true))throw new NooriError(503,'Cannot create the private protection backup.');
+ if(file_put_contents($backup.'/root.htaccess.original',$original,LOCK_EX)===false)throw new NooriError(503,'Cannot back up the root download rules.');
+ $clean=preg_replace('/# BEGIN NOORI PRIVATE DOWNLOAD GUARD.*?# END NOORI PRIVATE DOWNLOAD GUARD\s*/s','',$original);
+ $temp=$backup.'/root.htaccess.new';if(file_put_contents($temp,$guard."\n".$clean,LOCK_EX)===false||!rename($temp,$path))throw new NooriError(503,'Cannot update root download protection. Ask the host to allow this website to write its own .htaccess.');chmod($path,0644);
+}
 function nooriSecureLegacyDownloads(string $app,string $private):array {
  $plan=nooriUpgradePlan($app,$private);$root=$plan['root'];$backup=$plan['private'].'/legacy-public-backup/'.gmdate('Ymd_His').'_'.bin2hex(random_bytes(4));
  if(!mkdir($backup,0700,true))throw new NooriError(503,'Cannot create the private backup folder.');
- $htaccess=$root.'/.htaccess';$original=is_file($htaccess)?file_get_contents($htaccess):'';if($original===false)throw new NooriError(503,'Cannot read the root .htaccess.');
- file_put_contents($backup.'/root.htaccess.backup',$original,LOCK_EX);
- $start='# BEGIN NOORI PRIVATE DOWNLOAD GUARD';$end='# END NOORI PRIVATE DOWNLOAD GUARD';
- $clean=preg_replace('/'.preg_quote($start,'/').'.*?'.preg_quote($end,'/').'\s*/s','',$original);
- $guard=$start."\n<IfModule mod_rewrite.c>\nRewriteEngine On\nRewriteRule ^(?:noori-activation/)?(?:downloads(?:\\.[0-9]+)?/)?NOORI[^/]*\\.(?:zip|exe)$ - [F,L,NC]\n</IfModule>\n".$end."\n";
- $temporary=$backup.'/root.htaccess.new';if(file_put_contents($temporary,$guard.$clean,LOCK_EX)===false||!rename($temporary,$htaccess))throw new NooriError(503,'Cannot install the root download guard. No old files were moved.');chmod($htaccess,0644);
+ nooriInstallDownloadGuard($app,$private);
  $moved=[];$errors=[];
  foreach($plan['files'] as $relative=>$source){
   if(is_link($source)){$errors[]=$relative;continue;}$destination=$backup.'/files/'.$relative;

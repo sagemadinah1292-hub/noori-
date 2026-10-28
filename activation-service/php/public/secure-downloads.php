@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
-require __DIR__.'/bootstrap.php';if(!is_file($privateDir.'/portal.php')||!is_file($privateDir.'/portal-deploy.php')){http_response_code(503);exit('Upload the private portal upgrade first.');}require_once $privateDir.'/portal.php';require_once $privateDir.'/portal-deploy.php';nooriSession('noori_owner');
-if(!isset($_SESSION['owner'])||time()-(int)($_SESSION['last_seen']??0)>1800){unset($_SESSION['owner']);nooriRedirect('admin.php');}$_SESSION['last_seen']=time();$error='';$result=null;$plan=null;$ready=false;
+require __DIR__.'/bootstrap.php';if(!is_file($privateDir.'/portal.php')||!is_file($privateDir.'/portal-deploy.php')){http_response_code(503);exit('Upload the private portal upgrade first.');}require_once $privateDir.'/portal.php';require_once $privateDir.'/portal-deploy.php';nooriSession();
+if(!nooriOwner()){if(($_SESSION['role']??'')==='friend'){http_response_code(403);exit('Owner access required.');}nooriRedirect('login.php');}$error='';$result=null;$plan=null;$ready=false;
 try{
  new NooriPortal(nooriDb());$downloads=nooriDownloads();$ready=true;
  if($_SERVER['REQUEST_METHOD']==='POST'){nooriCsrf();if(($_POST['reviewed']??'')!=='yes')throw new NooriError(400,'Review the file list and tick the confirmation.');$result=nooriSecureLegacyDownloads(__DIR__,$privateDir);$_SESSION['csrf']=bin2hex(random_bytes(32));}

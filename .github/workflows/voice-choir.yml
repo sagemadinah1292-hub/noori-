@@ -154,6 +154,7 @@ jobs:
             dist-activation/NOORI-Final-Public-Upgrade.zip
             dist-activation/NOORI-Final-Private-Upgrade.zip
             dist-activation/NOORI-FINAL-UPLOAD-GUIDE.txt
+            dist-activation/NOORI-EMERGENCY-DOWNLOAD-GUARD.txt
           if-no-files-found: error
       - name: Upload installer and test evidence
         uses: actions/upload-artifact@v4

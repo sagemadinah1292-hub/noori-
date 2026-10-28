@@ -10,7 +10,10 @@ $portal=new NooriPortal($db);$db->exec('DELETE FROM noori_accounts;DELETE FROM n
 $key=openssl_pkey_new(['private_key_bits'=>2048,'private_key_type'=>OPENSSL_KEYTYPE_RSA]);openssl_pkey_export($key,$pem);$service=new NooriService($db,$pem);$now=time();$password='Friend-password-123!';
 $invitation=$service->issue(1,'trial',null,$now)[0];
 denied(fn()=>$portal->register('friend@example.com',$password,'NOORI-T-'.str_repeat('F',32),$now),403);
-$account=$portal->register(' Friend@Example.com ',$password,$invitation['serial'],$now);ok($account['email']==='friend@example.com','Email normalized.');ok($account['device_id']===null&&$account['activated_at']===null&&$account['expires_at']===null,'Website signup must not bind a Windows machine or start a trial.');
+$proof=$portal->invitation(' Friend@Example.com ',$invitation['serial'],$now);
+ok(!isset($proof['serial'])&&$db->query('SELECT COUNT(*) FROM noori_accounts')->fetchColumn()==0,'First step stores no raw serial or account.');
+denied(fn()=>$portal->completeRegistration($proof,$password,$now+600),403);
+$account=$portal->completeRegistration($proof,$password,$now);ok($account['email']==='friend@example.com','Email normalized.');ok($account['device_id']===null&&$account['activated_at']===null&&$account['expires_at']===null,'Website signup must not bind a Windows machine or start a trial.');
 ok(NooriPortal::mayDownload($account,$now),'Unused trial invitation can download.');
 $hash=$db->query('SELECT password_hash FROM noori_accounts')->fetchColumn();ok($hash!==$password&&password_verify($password,$hash),'Only password hash stored.');
 denied(fn()=>$portal->register('other@example.com',$password,$invitation['serial'],$now),403);

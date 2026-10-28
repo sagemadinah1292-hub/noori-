@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-require __DIR__.'/portal-bootstrap.php';if(!$friend)nooriRedirect('login.php');$allowed=NooriPortal::mayDownload($friend,time());$release=null;$downloadError='';try{$release=nooriDownloads()['release'];}catch(Throwable $e){$downloadError=$e instanceof NooriError?$e->getMessage():'Downloads are temporarily unavailable.';}
+require __DIR__.'/portal-bootstrap.php';if(nooriOwner())nooriRedirect('admin.php');if(!$friend)nooriRedirect('login.php');$allowed=NooriPortal::mayDownload($friend,time());$release=null;$downloadError='';try{$release=nooriDownloads()['release'];}catch(Throwable $e){$downloadError=$e instanceof NooriError?$e->getMessage():'Downloads are temporarily unavailable.';}
 $accessStatus='Activated';
 if((int)$friend['revoked']!==0)$accessStatus='Disabled — contact NOORI';
 elseif(!$allowed)$accessStatus='Trial ended — ask NOORI for free full access';

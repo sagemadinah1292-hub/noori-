@@ -3,7 +3,7 @@ from pathlib import Path
 import zipfile
 root=Path(__file__).resolve().parents[1]
 output=root.parent/'dist-activation';output.mkdir(exist_ok=True)
-public_names=['bootstrap.php','index.php','index.html','admin.php','setup.php','.htaccess','portal-bootstrap.php','home.php','login.php','register.php','dashboard.php','download.php','logout.php','change-password.php','reset-password.php','secure-downloads.php']
+public_names=['bootstrap.php','index.php','index.html','admin.php','setup.php','.htaccess','portal-bootstrap.php','home.php','login.php','account.php','register.php','create-password.php','dashboard.php','download.php','logout.php','change-password.php','reset-password.php','secure-downloads.php']
 private_names=['service.php','portal.php','portal-deploy.php','schema.mysql.sql','config.example.php','.htaccess']
 assets=['site.css','noori-logo.svg']
 with zipfile.ZipFile(output/'NOORI-Activation-Hostinger.zip','w',zipfile.ZIP_DEFLATED) as z:

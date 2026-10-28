@@ -19,16 +19,23 @@ artifacts from the successful Windows build:
    `public_html/noori-activation`. It adds the actual register/login/dashboard/
    password/download pages and updates index.php, admin.php and .htaccess.
    The already configured bootstrap.php is not replaced.
-4. Open admin.php with your existing owner login. Open **Review and secure the
-   website upgrade**. It lists the exact old public NOORI files found on your host.
+4. Open the normal website → Sign in. Use Owner ID `owner` and the EXISTING owner
+   password from setup. The role opens the separate owner dashboard, which installs
+   the root public-file deny rules automatically and backs up the old .htaccess.
+   It reports any protection failure instead of claiming success. Friend email/
+   password opens a limited user dashboard; friends receive HTTP 403 on owner
+   pages/actions. Everyone uses the same sign-in screen. Existing sessions need
+   to sign in again after this update, without resetting passwords or keys.
+   Under Website management open **Review and secure the website upgrade**. It lists the exact old public NOORI files found on your host.
    Review and apply. The operation moves identified installers, public website ZIPs,
    duplicate assets and root PHP copies into `noori-private/legacy-public-backup/`.
    It backs up the root .htaccess and adds a managed NOORI archive-denial rule.
    Nothing is deleted. Unknown hosting files, .private, default.php and llms.txt
    are preserved. Investigate any reported errors before sharing the portal.
 5. Generate one trial invitation assigned to your own email. Save the CSV privately.
-   In an incognito browser create an account using that email, the invitation key,
-   and a new password. Sign in and download from the dashboard.
+   In an incognito browser enter the email and invitation key, continue to the
+   Create password step, then finish registration. Only the completed,
+   authenticated account can download from its user dashboard.
 6. Signed out, dashboard.php/download.php must require sign-in. At BOTH the root
    and /noori-activation, old /downloads/...exe, suffixed download folders and
    NOORI-Website-With-Plugin.zip links must return 403 or 404. Re-test installer
@@ -110,3 +117,28 @@ Version 0.4.1 includes the supplied public trust configuration in
 voice-choir/Config/Activation.json and requires registration by default. Private
 signing keys stay on the server. CMake/Actions can explicitly override public
 configuration. No live activation or Cubase integration is inferred from CI alone.
+
+## Common entry, distinct roles
+
+The homepage contains normal registration and sign-in navigation. There is no
+separate public Owner sign-in or upgrade entry in the footer. `account.php` routes
+authenticated roles to their own dashboard. Owner ID defaults to `owner`; the
+private config may optionally set `owner_login` to a different ID. The owner uses
+the original owner password hash; a user cannot choose or submit an owner role.
+Owner controls include invitations, recovery, key status, private downloads and
+website management. Friends can access only their own account and authorized
+files. A user POSTing to admin.php with a valid user CSRF token is still denied.
+
+The first registration step validates an invitation and stores a short-lived
+server-side proof containing its hash, not the raw serial. It neither creates an
+account nor reserves the email. The password step rechecks the invitation under
+a database lock, reserves the email and creates the account. Pending registration
+expires after ten minutes and cannot download. Trial/device binding still happens
+only in the Windows plugin.
+
+For an immediate manual block during a deployment, prepend the contents of
+NOORI-EMERGENCY-DOWNLOAD-GUARD.txt to public_html/.htaccess while preserving its
+existing rules. This denies direct public .exe/.zip/.vst3/.dll files throughout
+the website. The authenticated PHP download handler remains available. The owner
+dashboard installs the same additive block automatically after the new code is
+uploaded and the owner signs in. Always verify in an incognito browser afterwards.
