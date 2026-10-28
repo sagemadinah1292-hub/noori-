@@ -1,7 +1,10 @@
 Options -Indexes
-DirectoryIndex index.html index.php
+DirectoryIndex index.php
 RewriteEngine On
+RewriteRule ^downloads(?:\.[0-9]+)?(?:/|$) - [F,L,NC]
+RewriteRule \.(?:zip|exe|pem|jwk|sql|sqlite|db|json)$ - [F,L,NC]
+RewriteRule ^index\.html$ index.php [L]
 RewriteRule ^(?:v1/(?:activate|check)|health)/?$ index.php [L]
-<FilesMatch "^(?:bootstrap\.php|.*\.(?:pem|jwk|sql|sqlite|db|json))$">
+<FilesMatch "^(?:bootstrap|portal-bootstrap|config)\.php$">
   Require all denied
 </FilesMatch>

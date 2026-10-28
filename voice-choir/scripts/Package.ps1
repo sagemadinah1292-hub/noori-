@@ -25,7 +25,7 @@ Copy-Item -Recurse '.github' $source
 $activationFiles=& git ls-files -- activation-service
 foreach ($trackedFile in $activationFiles) {
   if ($trackedFile -match '^activation-service/(private|data|node_modules|\.wrangler)/') {continue}
-  if ($trackedFile -match '^activation-service/php/private/' -and $trackedFile -notmatch '/(service\.php|schema\.mysql\.sql|config\.example\.php|\.htaccess)$') {continue}
+  if ($trackedFile -match '^activation-service/php/private/' -and $trackedFile -notmatch '/(service\.php|portal\.php|portal-deploy\.php|schema\.mysql\.sql|config\.example\.php|\.htaccess)$') {continue}
   $copyTarget=Join-Path $source $trackedFile
   New-Item -ItemType Directory -Force -Path (Split-Path $copyTarget) | Out-Null
   Copy-Item $trackedFile $copyTarget

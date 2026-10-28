@@ -36,7 +36,7 @@ with tempfile.TemporaryDirectory(prefix='noori-php-http-') as temp:
             try:call('/health');break
             except OSError:time.sleep(.05)
         else:raise AssertionError('PHP server did not start')
-        status,headers,data=call('/');assert status==200 and b'NOORI CHOIR' in data and b'Registration / Trial' in data,'Public landing page works before service setup'
+        status,headers,data=call('/');assert status==200 and b'NOORI CHOIR' in data and b'index.php' in data,'Public landing page works before service setup'
         for asset,content_type in [('/assets/site.css','text/css'),('/assets/noori-logo.svg','image/svg+xml')]:
             status,headers,data=call(asset);assert status==200 and headers['content-type'].startswith(content_type) and len(data)>100,'Branded local assets served'
         status,_,_=call('/__insecure/admin.php');assert status==403,'HTTPS required'

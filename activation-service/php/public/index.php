@@ -1,6 +1,9 @@
 <?php
 declare(strict_types=1);
-require __DIR__.'/bootstrap.php';header('Content-Type: application/json; charset=utf-8');
+require __DIR__.'/bootstrap.php';
+$base=rtrim(parse_url($config['public_url'],PHP_URL_PATH)?:'','/');$path=parse_url($_SERVER['REQUEST_URI'],PHP_URL_PATH);
+if(in_array($path,[$base,$base.'/',$base.'/index.php',$base.'/index.html'],true)){require __DIR__.'/home.php';exit;}
+header('Content-Type: application/json; charset=utf-8');
 try{
  $base=rtrim(parse_url($config['public_url'],PHP_URL_PATH)?:'','/');$path=parse_url($_SERVER['REQUEST_URI'],PHP_URL_PATH);
  if($path===$base.'/health'){

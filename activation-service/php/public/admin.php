@@ -1,11 +1,13 @@
 <?php
 declare(strict_types=1);
 require __DIR__.'/bootstrap.php';
+if(!is_file($privateDir.'/portal.php')){http_response_code(503);exit('Upload the private portal upgrade first.');}
+require_once $privateDir.'/portal.php';
 if(!is_file($privateDir.'/installed.marker')){http_response_code(503);exit('Complete setup.php first.');}
-ini_set('session.use_strict_mode','1');session_name('noori_owner');session_set_cookie_params(['secure'=>true,'httponly'=>true,'samesite'=>'Strict','path'=>(parse_url($config['public_url'],PHP_URL_PATH)?:'/')]);session_start();
-$error='';$rows=[];$publicKey='';
+nooriSession('noori_owner');
+$error='';$rows=[];$publicKey='';$accounts=[];$recoveryCode='';$recoveryEmail='';
 try{
- $service=nooriService();
+ $service=nooriService();$portal=new NooriPortal(nooriDb());
  if(isset($_SESSION['owner'])&&time()-(int)($_SESSION['last_seen']??0)>1800)unset($_SESSION['owner']);
  $_SESSION['csrf']??=bin2hex(random_bytes(32));
  if($_SERVER['REQUEST_METHOD']==='POST'){
@@ -23,9 +25,11 @@ try{
    $_SESSION['csrf']=bin2hex(random_bytes(32));session_write_close();
    header('Content-Type: text/csv; charset=utf-8');header('Content-Disposition: attachment; filename="NOORI-private-friend-keys.csv"');
    $out=fopen('php://output','wb');fputcsv($out,['Serial','Type','Email','Owner record ID'],',','"','');foreach($keys as $key)fputcsv($out,[$key['serial'],$key['kind'],$key['email'],$key['id']],',','"','');fclose($out);exit;
+  }elseif($action==='recovery'){
+   $id=(string)($_POST['id']??'');$account=$portal->account($id);if(!$account)throw new NooriError(404,'Account not found.');$recoveryCode=$portal->recovery($id,time());$recoveryEmail=$account['email'];$_SESSION['csrf']=bin2hex(random_bytes(32));
   }else{$service->change((string)($_POST['id']??''),$action);}
  }
- if(isset($_SESSION['owner'])){$_SESSION['last_seen']=time();$rows=$service->all();$publicKey=trim(file_get_contents($privateDir.'/public-modulus.txt'));}
+ if(isset($_SESSION['owner'])){$_SESSION['last_seen']=time();$rows=$service->all();$accounts=$portal->accounts();$publicKey=trim(file_get_contents($privateDir.'/public-modulus.txt'));}
 }catch(NooriError $e){http_response_code($e->status);$error=$e->getMessage();}
 catch(Throwable){http_response_code(503);$error='The owner service is unavailable. Check the private configuration and database.';}
 ?><!doctype html><html lang="en"><meta charset="utf-8"><title>NOORI friend keys</title>
@@ -34,6 +38,8 @@ catch(Throwable){http_response_code(503);$error='The owner service is unavailabl
 <?php if(!isset($_SESSION['owner'])):?><form method="post"><input type="hidden" name="csrf" value="<?=esc($_SESSION['csrf']??'')?>"><input type="hidden" name="action" value="login"><label>Owner password <input name="password" type="password" required autocomplete="current-password"></label><button>Sign in</button></form>
 <?php else:?>
 <form method="post"><input type="hidden" name="csrf" value="<?=esc($_SESSION['csrf'])?>"><button name="action" value="logout">Sign out</button></form>
+<section><h2>Download website</h2><p><a href="secure-downloads.php">Review and secure the website upgrade →</a> · <a href="./">Open the friend portal →</a></p><p>Friends register with email, invitation key and a password, then sign in to download. Website registration reserves their email without starting the plugin trial or binding a computer.</p></section>
+<section><h2>Friend accounts</h2><?php if($recoveryCode):?><p>One-time recovery code for <?=esc($recoveryEmail)?>. Valid for 15 minutes; send it privately and ask the friend to open reset-password.php. This code is shown once.</p><textarea readonly><?=esc($recoveryCode)?></textarea><?php endif;?><table><thead><tr><th>Email</th><th>Access</th><th>Account created (UTC)</th><th>Recovery</th></tr></thead><tbody><?php foreach($accounts as $account):?><tr><td><?=esc($account['email'])?></td><td><?=esc($account['kind'])?><?=((int)$account['revoked'])?' — disabled':''?></td><td><?=esc(gmdate('Y-m-d H:i',(int)$account['created_at']))?></td><td><form method="post"><input type="hidden" name="csrf" value="<?=esc($_SESSION['csrf'])?>"><input type="hidden" name="id" value="<?=esc($account['id'])?>"><button name="action" value="recovery">Create recovery code</button></form></td></tr><?php endforeach;?></tbody></table></section>
 <section><h2>Generate invitations</h2><p>Each key binds to the first registered email and computer. Send one key privately to each friend through Gmail or Live.com. There are no payment steps.</p><p>Download and keep the CSV. Full serials are not stored in the database and cannot be recovered. Refresh this page after downloading.</p>
 <form method="post"><input type="hidden" name="csrf" value="<?=esc($_SESSION['csrf'])?>"><input type="hidden" name="action" value="generate"><label>Keys <input name="count" type="number" min="1" max="100" value="20"></label><label>Type <select name="kind"><option value="trial">Three-day trial</option><option value="full">Free full access</option></select></label><label>Assign email (one key only) <input name="email" type="email" placeholder="Optional for a single key"></label><button>Generate and download CSV</button></form></section>
 <section><h2>Registered keys</h2><p>Grant full access after a trial, disable a key, or explicitly reset its computer binding. Resetting a computer never restarts a trial. Changes take effect by the next online lease renewal (up to 15 minutes).</p>

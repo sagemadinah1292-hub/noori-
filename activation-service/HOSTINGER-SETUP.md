@@ -1,143 +1,112 @@
-# Hostinger PHP/MySQL setup — owner only
+# NOORI Hostinger account portal — owner setup and upgrades
 
-Planned URL: `https://www.noorivst.stopncart.com/noori-activation`.
-This is a deployment guide, not a statement that the site has been deployed or
-that this domain's TLS certificate has been verified.
+The friend portal lives at `https://www.noorivst.stopncart.com/noori-activation/`.
+Live verification must be done after upload; local/CI checks do not establish
+that a particular Hostinger installation has been upgraded.
 
-## Add activation to the already uploaded download website
+## Upgrade the existing, working activation service
 
-Use the two separate activation ZIPs to keep the working download page in place:
+Do not rerun initial setup or replace your signing key. Use the **Final Portal**
+artifacts from the successful Windows build:
 
-- Extract **NOORI-Activation-Public.zip** inside the existing public
-  `noori-activation/` directory. It contains PHP endpoint/setup/owner files and
-  the standard routing .htaccess. It does not replace index.html, assets or downloads.
-- Extract **NOORI-Activation-Private.zip** only inside `noori-private/` OUTSIDE
-  every public_html/web-root directory. Do not upload or extract this private ZIP
-  in the public website. It contains template/source files, not a production config
-  or signing key. Continue with private path/config/setup steps below.
+1. Back up your activation database and the existing `noori-private` directory
+   privately. Keep passwords, signing-private.pem and owner.json out of chat/Git.
+2. Extract **NOORI-Final-Private-Upgrade.zip** directly INSIDE `noori-private`,
+   outside every public_html. It adds portal.php, portal-deploy.php and downloads/.
+   It does not contain config.php, owner.json, signing-private.pem,
+   public-modulus.txt or installed.marker, so these files remain unchanged.
+3. Extract **NOORI-Final-Public-Upgrade.zip** directly INSIDE
+   `public_html/noori-activation`. It adds the actual register/login/dashboard/
+   password/download pages and updates index.php, admin.php and .htaccess.
+   The already configured bootstrap.php is not replaced.
+4. Open admin.php with your existing owner login. Open **Review and secure the
+   website upgrade**. It lists the exact old public NOORI files found on your host.
+   Review and apply. The operation moves identified installers, public website ZIPs,
+   duplicate assets and root PHP copies into `noori-private/legacy-public-backup/`.
+   It backs up the root .htaccess and adds a managed NOORI archive-denial rule.
+   Nothing is deleted. Unknown hosting files, .private, default.php and llms.txt
+   are preserved. Investigate any reported errors before sharing the portal.
+5. Generate one trial invitation assigned to your own email. Save the CSV privately.
+   In an incognito browser create an account using that email, the invitation key,
+   and a new password. Sign in and download from the dashboard.
+6. Signed out, dashboard.php/download.php must require sign-in. At BOTH the root
+   and /noori-activation, old /downloads/...exe, suffixed download folders and
+   NOORI-Website-With-Plugin.zip links must return 403 or 404. Re-test installer
+   download after sign-in. Test plugin activation in Cubase before sharing keys.
 
-Do not re-extract the full source-site ZIP over the working download website:
-its generic welcome page is not the generated page with local installer downloads.
-Back up a custom .htaccess before replacing it. Do not overwrite an existing live
-bootstrap.php configuration or private directory during an upgrade.
+The new account table is added with CREATE TABLE IF NOT EXISTS; existing license
+rows, passwords and signing keys are not migrated or reset. A website account
+reserves the invitation email but does not start a trial or bind a Windows PC.
+The trial starts on the first successful plugin activation and lasts 72 hours.
+Every file request checks the current account and license, including revocation
+or expiry after the user has logged in. A copied download.php link is not access.
+Binaries live only outside the web root and are streamed by an allowlisted PHP
+handler; no private path or public installer URL is returned to the browser.
 
-## Files and secrets
+## Expected folders after the upgrade
 
-1. In Hostinger, enable HTTPS for the domain and select PHP 8.2 or newer with
-   PDO MySQL and OpenSSL enabled.
-2. Create a **new, separate MySQL database and database user** for NOORI activation.
-   Keep its password in Hostinger/the private config. Do not send it in chat.
-3. Upload `noori-activation/` from the hosting ZIP into the domain's web root.
-   The public URL should then be `/noori-activation/`.
-4. Upload `noori-private/` **outside every public_html/web-root directory**, for
-   example `/home/u12345678/noori-private`. Do not put it inside another website's
-   public folder. Use owner-only directory/file permissions where supported.
-5. Edit the public `bootstrap.php` and set its private-directory path to that exact
-   absolute server path. The path is not a password; the files in that directory
-   contain secrets after setup.
-6. In the private directory, copy `config.example.php` to `config.php`. Enter the
-   database name, user and password, keep the correct public URL, and replace the
-   setup token with a unique random secret of at least 32 characters. Do not leave
-   any `CHANGE...` placeholders. Do not commit this file to Git.
-7. Open `/noori-activation/setup.php` using HTTPS. Enter that setup token and choose
-   an owner password of at least 14 characters. Setup creates the tables, private
-   RSA signing key, public modulus and owner password hash. Back up the private
-   folder and database securely. Losing/changing the signing key requires a new
-   plugin trust-key build.
-8. Delete the public `setup.php` after successful setup. It also refuses to run
-   again once the private installed marker exists. Clear the now-unused setup
-   token in the private configuration.
+```text
+noori-private/                     OUTSIDE public_html
+  config.php                      KEEP existing database settings
+  service.php
+  signing-private.pem             KEEP existing key, never share
+  owner.json                      KEEP existing owner password hash
+  installed.marker                KEEP
+  public-modulus.txt
+  portal.php
+  portal-deploy.php
+  downloads/                      protected installer, VST3/source and metadata
+  legacy-public-backup/            recoverable old public copies
+public_html/
+  .htaccess                       existing rules plus managed NOORI guard
+  index.html                      redirect if an old NOORI homepage was found
+  noori-activation/
+    bootstrap.php                 KEEP existing private-directory configuration
+    .htaccess
+    index.php, index.html          index.html redirects to the PHP portal
+    home.php, register.php, login.php, dashboard.php, logout.php
+    change-password.php, reset-password.php, download.php
+    portal-bootstrap.php, admin.php, secure-downloads.php
+    assets/
+```
 
-## Finish the protected Windows build
+There should be no public installer files, website-with-plugin archives or active
+public downloads directories. The upgrade tool only moves identified NOORI files;
+it does not remove unrelated website data. Any unrecognized leftover needs review.
 
-1. Log in to `/noori-activation/admin.php`.
-2. Copy the **public modulus** shown at the bottom. This public key and the API URL
-   can safely be supplied for the protected plugin build. Never supply the private
-   PEM, database password, setup token, or owner password.
-3. Compile with `NOORI_ENABLE_LICENSING=ON`, `NOORI_LICENSE_SERVER_URL` set to the
-   URL above, and `NOORI_LICENSE_PUBLIC_KEY_HEX` set to that public modulus. CMake
-   rejects an enabled build without HTTPS/public-key configuration.
-   Version 0.4.1 already contains the owner's supplied public values in
-   `voice-choir/Config/Activation.json` and enables protection by default.
-   Optional repository Actions variables `NOORI_ENABLE_LICENSING`,
-   `NOORI_LICENSE_SERVER_URL`, and `NOORI_LICENSE_PUBLIC_KEY_HEX` explicitly
-   override those defaults. Set `NOORI_ENABLE_LICENSING=OFF` only for an intentional
-   unprotected development build. `BUILD-INFO.json` records the compiled mode.
-4. Test one trial key end to end on the live host, including expiry/device binding,
-   before distributing the protected setup to friends. The unconfigured developer
-   installer is not a substitute for this step.
+## Password recovery and owner controls
 
-## Make the 20 keys
+Users sign up with a valid privately delivered invitation; public self-issue of
+trial keys is not allowed. Passwords are stored with password_hash and sessions
+use Secure/HttpOnly/SameSite cookies, CSRF tokens and expiry. Changing or recovering
+a password invalidates earlier sessions. There are no automatic verification or
+reset emails: possession of the privately delivered invitation is the enrollment
+proof; mailbox ownership is not independently verified.
 
-In the owner page choose **20**, then **Three-day trial** or **Free full access**,
-and click **Generate and download CSV**. Keep that CSV private; the database stores
-only key hashes and short hints, so full serials cannot be recovered later. Send
-one key per friend. To preassign an email, generate a single key with that address.
-A batch key otherwise binds its first registered email and computer.
+If a friend forgets their password, sign in to admin.php → Friend accounts →
+Create recovery code. Send the one-time code privately. It expires after 15 minutes
+and is stored only as a hash. The friend uses reset-password.php with their email,
+the code and a new password. Codes/passwords/serials never belong in chat.
 
-Friends install the protected plugin, open **Settings → Registration / Trial**,
-and enter their email and invitation key. The plugin sends only that email, key,
-request nonce and a hashed Windows-installation identifier over HTTPS. Audio is
-never sent to the activation service.
+Owner key actions remain available: grant free full access, disable/enable, reset
+computer. Resetting a computer does not restart a trial. Trial and full keys use
+online checks by default; an existing signed plugin lease can last up to 15 minutes
+after an owner change. A disabled/expired invitation immediately blocks the next
+website file request, even from an existing web session.
 
-A key remains usable on its registered Windows installation, including normal
-plugin restarts. Another computer is rejected. Windows reinstallation/identity
-changes may need an owner-approved reset. Deleting the local activation cache
-neither releases a key nor resets the server's trial deadline.
+## Initial setup on a fresh host only
 
-Use **Grant full access** after a trial to allow that friend permanent free access
-with the same key. **Disable** and **Reset computer** are explicit owner actions.
-An existing signed online session may remain usable for up to 15 minutes after an
-owner change. Keys cannot automatically create a fresh trial. Trial keys always
-require online validation; full-key offline policy is optional and defaults off.
+Use the source-only NOORI-Activation-Hostinger.zip. Upload public files into
+public_html/noori-activation and private files outside ALL public_html roots.
+Set bootstrap.php to the actual private path (for the sibling layout above,
+`$privateDir = dirname(__DIR__, 2) . '/noori-private';`). Copy config.example.php to
+config.php and fill the full MySQL database/user/password, HTTPS public_url, and
+an independent random setup_token of at least 32 characters. PHP 8.2+, PDO MySQL
+and OpenSSL are required. Open setup.php over HTTPS and choose an owner password
+of at least 14 characters. Back up the private key/database and delete setup.php
+when complete. Never deploy an old unprotected installer as the friends build.
 
-## Checks and recovery
-
-- `/noori-activation/health` must return `activationReady: true` over HTTPS.
-- Test the actual activation API and plugin, not health alone.
-- Owner login has rate limiting, secure/HttpOnly/SameSite cookies and CSRF-protected
-  state changes. Use HTTPS, a unique password and a current PHP version.
-- Do not enable request-body logging that records serials. Do not publish CSV files,
-  config, PEM keys, owner JSON or database dumps.
-- Database contents include registered emails, key hashes, machine-ID hashes and
-  activation/expiry times. Retain them only as needed for your friends' access.
-- If unavailable, the plugin preserves dry track audio. Licensed features stop when
-  the current online lease ends; a network failure never deletes generated audio.
-
-## Public welcome page
-
-The public directory includes a responsive NOORI welcome page with the supplied
-white logo, plugin registration instructions and FAQs. Apache's DirectoryIndex
-selects index.html, while the existing PHP API endpoints continue to use index.php.
-The page can be displayed before the private database service is configured.
-It does not accept serials or register computers in a web browser.
-
-For the welcome page alone, upload and extract NOORI-Page-Only.zip inside this
-domain's public_html/noori-activation folder. The ZIP includes index.html, assets,
-and the standard activation-directory .htaccess. Back up an existing custom
-.htaccess before replacing it. It contains no owner portal, API implementation,
-configuration, credentials or private signing keys. Complete the full service
-setup above before using Owner sign in or distributing the protected plugin.
-
-## Website with actual plugin downloads
-
-Use **NOORI-Website-With-Plugin.zip** when you want the installer and VST3 archive
-hosted on your own website. Upload and extract its contents directly inside
-`public_html/noori-activation/`: `index.html`, `.htaccess`, `assets/`, and
-`downloads/` belong at that level, not inside another nested folder. Back up an
-existing custom `.htaccess` before replacement. Existing PHP service/config files
-are not included or overwritten. The welcome-page-only ZIP does not include binaries.
-
-This package includes the real installer, VST3 plus project sources, the actual
-plugin screenshot, installation instructions, SHA-256 checksums and build evidence.
-The download buttons use relative local file URLs; friends do not need GitHub
-accounts. The archive label follows its compiled mode: 0.4.1 defaults to registration
-required, while an explicit development build says serial/trial enforcement is
-disabled. Never advertise an unprotected artifact as a protected trial installer.
-Test the protected installer against the live host before sharing it.
-
-Actions builds this complete package after all Windows tests and the installer
-smoke test pass, and uploads it as `NOORI-Website-With-Plugin`. For a local package
-using existing tested artifacts, run `scripts/package-website.py --help`.
-Public metadata uses `.txt` filenames because the activation directory blocks
-public access to `.json` files. No private keys or live credentials go in downloads.
+Version 0.4.1 includes the supplied public trust configuration in
+voice-choir/Config/Activation.json and requires registration by default. Private
+signing keys stay on the server. CMake/Actions can explicitly override public
+configuration. No live activation or Cubase integration is inferred from CI alone.

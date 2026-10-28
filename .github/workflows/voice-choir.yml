@@ -50,8 +50,24 @@ jobs:
           NOORI_TEST_USER: noori_ci
           NOORI_TEST_PASSWORD: ci-only-test-password
         run: python3 activation-service/php/tests/http_test.py
+      - name: Test portal account logic with MySQL
+        env:
+          NOORI_TEST_DSN: 'mysql:host=127.0.0.1;port=3306;dbname=noori_test;charset=utf8mb4'
+          NOORI_TEST_USER: noori_ci
+          NOORI_TEST_PASSWORD: ci-only-test-password
+        run: php activation-service/php/tests/portal_service_test.php
+      - name: Install Apache for real download access tests
+        run: sudo apt-get update -qq && sudo apt-get install -y apache2
+      - name: Test authenticated portal and Apache download protection
+        env:
+          NOORI_TEST_DSN: 'mysql:host=127.0.0.1;port=3306;dbname=noori_test;charset=utf8mb4'
+          NOORI_TEST_USER: noori_ci
+          NOORI_TEST_PASSWORD: ci-only-test-password
+        run: python3 activation-service/php/tests/portal_http_test.py
       - name: Test PHP service with isolated SQLite
-        run: php activation-service/php/tests/service_test.php
+        run: |
+          php activation-service/php/tests/service_test.php
+          php activation-service/php/tests/portal_service_test.php
       - name: Bundle Hostinger deployment files
         run: python3 activation-service/scripts/package-hostinger.py
       - uses: actions/upload-artifact@v4
@@ -59,7 +75,6 @@ jobs:
           name: NOORI-Activation-Hostinger
           path: |
             dist-activation/NOORI-Activation-Hostinger.zip
-            dist-activation/NOORI-Page-Only.zip
             dist-activation/NOORI-Activation-Public.zip
             dist-activation/NOORI-Activation-Private.zip
           if-no-files-found: error
@@ -119,14 +134,17 @@ jobs:
       - name: Compile and test Windows installer
         shell: pwsh
         run: ./voice-choir/scripts/BuildInstaller.ps1
-      - name: Bundle website with tested plugin downloads
+      - name: Bundle authenticated portal with private plugin downloads
         shell: pwsh
         run: python activation-service/scripts/package-website.py --installer dist-choir/NOORI_CHOIR_Setup_x64.exe --vst3-package dist-choir/Noori-Choir-0.4.1-Windows-x64.zip --build-info dist-choir/Noori-Choir-0.4.1-Windows-x64/BUILD-INFO.json --installer-tests dist-choir/INSTALLER-TEST-RESULTS.json --preview build-choir/Preview-Results.png
-      - name: Upload website with plugin downloads
+      - name: Upload final authenticated website
         uses: actions/upload-artifact@v4
         with:
-          name: NOORI-Website-With-Plugin
-          path: dist-activation/NOORI-Website-With-Plugin.zip
+          name: NOORI-Final-Portal
+          path: |
+            dist-activation/NOORI-Final-Public-Upgrade.zip
+            dist-activation/NOORI-Final-Private-Upgrade.zip
+            dist-activation/NOORI-FINAL-UPLOAD-GUIDE.txt
           if-no-files-found: error
       - name: Upload installer and test evidence
         uses: actions/upload-artifact@v4
