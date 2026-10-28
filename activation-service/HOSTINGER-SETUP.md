@@ -57,11 +57,12 @@ bootstrap.php configuration or private directory during an upgrade.
 3. Compile with `NOORI_ENABLE_LICENSING=ON`, `NOORI_LICENSE_SERVER_URL` set to the
    URL above, and `NOORI_LICENSE_PUBLIC_KEY_HEX` set to that public modulus. CMake
    rejects an enabled build without HTTPS/public-key configuration.
-   For GitHub Actions, set these three repository **Actions variables** (public
-   configuration, not secrets): `NOORI_ENABLE_LICENSING=ON`,
-   `NOORI_LICENSE_SERVER_URL`, and `NOORI_LICENSE_PUBLIC_KEY_HEX`, then run the
-   Windows workflow. With no variables, Actions deliberately builds an
-   unprotected development installer; `BUILD-INFO.json` records that status.
+   Version 0.4.1 already contains the owner's supplied public values in
+   `voice-choir/Config/Activation.json` and enables protection by default.
+   Optional repository Actions variables `NOORI_ENABLE_LICENSING`,
+   `NOORI_LICENSE_SERVER_URL`, and `NOORI_LICENSE_PUBLIC_KEY_HEX` explicitly
+   override those defaults. Set `NOORI_ENABLE_LICENSING=OFF` only for an intentional
+   unprotected development build. `BUILD-INFO.json` records the compiled mode.
 4. Test one trial key end to end on the live host, including expiry/device binding,
    before distributing the protected setup to friends. The unconfigured developer
    installer is not a substitute for this step.
@@ -130,9 +131,10 @@ are not included or overwritten. The welcome-page-only ZIP does not include bina
 This package includes the real installer, VST3 plus project sources, the actual
 plugin screenshot, installation instructions, SHA-256 checksums and build evidence.
 The download buttons use relative local file URLs; friends do not need GitHub
-accounts. The current owner development build explicitly says that serial/trial
-enforcement is disabled. It must not be described as the protected trial installer.
-The live activation backend and its public signing key are still required for that.
+accounts. The archive label follows its compiled mode: 0.4.1 defaults to registration
+required, while an explicit development build says serial/trial enforcement is
+disabled. Never advertise an unprotected artifact as a protected trial installer.
+Test the protected installer against the live host before sharing it.
 
 Actions builds this complete package after all Windows tests and the installer
 smoke test pass, and uploads it as `NOORI-Website-With-Plugin`. For a local package

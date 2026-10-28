@@ -1,5 +1,5 @@
 #ifndef SourceDir
-  #define SourceDir "..\..\dist-choir\Noori-Choir-0.4.0-Windows-x64"
+  #define SourceDir "..\..\dist-choir\Noori-Choir-0.4.1-Windows-x64"
 #endif
 #ifndef ActivationRequired
  #define ActivationRequired 0
@@ -7,7 +7,7 @@
 [Setup]
 AppId={{F34706D1-B697-461C-9C81-A56C81A39B77}
 AppName=NOORI CHOIR
-AppVersion=0.4.0
+AppVersion=0.4.1
 AppPublisher=Noori
 DefaultDirName={commoncf64}\VST3
 DisableDirPage=no

@@ -80,8 +80,15 @@ jobs:
           NOORI_ACTIVATION_URL: ${{ vars.NOORI_LICENSE_SERVER_URL }}
           NOORI_PUBLIC_MODULUS: ${{ vars.NOORI_LICENSE_PUBLIC_KEY_HEX }}
         run: |
-          $licensing=if ($env:NOORI_PROTECTED_BUILD -eq 'ON') {'ON'} else {'OFF'}
-          cmake -S voice-choir -B build-choir -G "Visual Studio 17 2022" -A x64 "-DNOORI_ENABLE_LICENSING=$licensing" "-DNOORI_LICENSE_SERVER_URL=$env:NOORI_ACTIVATION_URL" "-DNOORI_LICENSE_PUBLIC_KEY_HEX=$env:NOORI_PUBLIC_MODULUS"
+          $cmakeArgs=@('-S','voice-choir','-B','build-choir','-G','Visual Studio 17 2022','-A','x64')
+          # Repository configuration enables protection by default. Variables are explicit overrides.
+          if ($env:NOORI_PROTECTED_BUILD) {
+            if ($env:NOORI_PROTECTED_BUILD -notin @('ON','OFF')) {throw 'NOORI_ENABLE_LICENSING must be ON or OFF'}
+            $cmakeArgs+="-DNOORI_ENABLE_LICENSING=$env:NOORI_PROTECTED_BUILD"
+          }
+          if ($env:NOORI_ACTIVATION_URL) {$cmakeArgs+="-DNOORI_LICENSE_SERVER_URL=$env:NOORI_ACTIVATION_URL"}
+          if ($env:NOORI_PUBLIC_MODULUS) {$cmakeArgs+="-DNOORI_LICENSE_PUBLIC_KEY_HEX=$env:NOORI_PUBLIC_MODULUS"}
+          & cmake @cmakeArgs
           if ($LASTEXITCODE -ne 0) {throw 'Windows configuration failed'}
       - name: Compile VST3 and tests
         run: cmake --build build-choir --config Release --parallel 2
@@ -114,7 +121,7 @@ jobs:
         run: ./voice-choir/scripts/BuildInstaller.ps1
       - name: Bundle website with tested plugin downloads
         shell: pwsh
-        run: python activation-service/scripts/package-website.py --installer dist-choir/NOORI_CHOIR_Setup_x64.exe --vst3-package dist-choir/Noori-Choir-0.4.0-Windows-x64.zip --build-info dist-choir/Noori-Choir-0.4.0-Windows-x64/BUILD-INFO.json --installer-tests dist-choir/INSTALLER-TEST-RESULTS.json --preview build-choir/Preview-Results.png
+        run: python activation-service/scripts/package-website.py --installer dist-choir/NOORI_CHOIR_Setup_x64.exe --vst3-package dist-choir/Noori-Choir-0.4.1-Windows-x64.zip --build-info dist-choir/Noori-Choir-0.4.1-Windows-x64/BUILD-INFO.json --installer-tests dist-choir/INSTALLER-TEST-RESULTS.json --preview build-choir/Preview-Results.png
       - name: Upload website with plugin downloads
         uses: actions/upload-artifact@v4
         with:
@@ -132,8 +139,8 @@ jobs:
       - name: Upload tested Windows x64 VST3 package
         uses: actions/upload-artifact@v4
         with:
-          name: Noori-Choir-0.4.0-Windows-x64
-          path: dist-choir/Noori-Choir-0.4.0-Windows-x64.zip
+          name: Noori-Choir-0.4.1-Windows-x64
+          path: dist-choir/Noori-Choir-0.4.1-Windows-x64.zip
           if-no-files-found: error
       - name: Upload UI previews
         uses: actions/upload-artifact@v4

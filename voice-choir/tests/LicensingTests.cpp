@@ -1,11 +1,20 @@
 #include "Plugin.h"
+#include "NooriLicenseConfig.h"
 #include <iostream>
 using namespace juce;
 using namespace noori_licensing;
 void check(bool value,const char* message){if(!value)throw std::runtime_error(message);}
 void activated(Manager& manager){const double end=Time::getMillisecondCounterHiRes()+15000;while(!manager.canUse()){check(Time::getMillisecondCounterHiRes()<end,manager.snapshot().message.toRawUTF8());Thread::sleep(5);}}
 int main(int argc,char** argv){try{
- ScopedJuceInitialiser_GUI init;check(argc==2,"Pass activation fixture path");const auto fixture=JSON::parse(File(argv[1]).loadFileAsString());check(fixture.isObject(),"Activation fixture is available");
+ ScopedJuceInitialiser_GUI init;
+ const auto compiled=buildConfig();check(compiled.enabled==(NOORI_ENABLE_LICENSING!=0),"Compiled activation mode matches generated configuration");
+ if(compiled.enabled){
+  check(compiled.apiBase.startsWith("https://")&&compiled.publicModulusHex.length()==512,"Protected build embeds HTTPS and RSA trust key");
+  MemoryBlock publicBytes;publicBytes.loadFromHexString(compiled.publicModulusHex);std::cout<<"Protected default API: "<<compiled.apiBase<<"; public modulus SHA-256: "<<SHA256(publicBytes.getData(),publicBytes.getSize()).toHexString()<<'\n';
+  ChoirProcessor factoryDefault;check(factoryDefault.licensing.snapshot().configured&&!factoryDefault.licensing.canUse(),"Default plugin constructor enforces registration before use");
+  factoryDefault.startCapture();check(!factoryDefault.isCapturing(),"Default protected build blocks unregistered capture");
+ }
+ check(argc==2,"Pass activation fixture path");const auto fixture=JSON::parse(File(argv[1]).loadFileAsString());check(fixture.isObject(),"Activation fixture is available");
  const auto modulus=fixture["publicModulus"].toString(),email=fixture["email"].toString(),device=fixture["deviceId"].toString(),nonce=fixture["nonce"].toString();
  auto grant=verifyGrant(fixture["token"],modulus,email,device,nonce);check(grant.valid&&grant.trial&&grant.onlineRequired,"Real RSA-PSS signature validates on Windows");
  check(verifyGrant(fixture["phpCompatibleToken"],modulus,email,device,nonce).valid,"PHP-compatible RS256 signature verifies on Windows");

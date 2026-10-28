@@ -29,10 +29,11 @@ server or include test signing material in a real service.
 
 ## Current delivery status
 
-Source, local tests and CI can be prepared without hosting credentials. The live
-service is **not deployed**, and a protected friends build cannot be finalized
-until HTTPS, the database and the production signing key exist. The normal
-unconfigured development build keeps activation enforcement off explicitly.
+The owner deploys the PHP/MySQL service and keeps its private signing key outside
+the web root. Version 0.4.1 embeds the supplied public trust configuration and
+requires registration by default. Live end-to-end plugin activation is a separate
+acceptance check; successful compilation or owner-panel login does not verify it.
+Explicit development builds disable enforcement and identify that status.
 
 The project is currently AGPL; activation does not remove recipients' existing
 source-code rights. This is protection against casual key sharing, not a claim

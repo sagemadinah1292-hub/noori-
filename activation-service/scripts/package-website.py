@@ -56,11 +56,12 @@ def download_link(kind,path,label):
 
 download_link('installer','downloads/NOORI_CHOIR_Setup_x64.exe','Download Windows installer (.exe)')
 download_link('vst3','downloads/NOORI-CHOIR-Windows-x64.zip','Manual VST3 + source (.zip)')
-page=page.replace('<span id="download-version">0.4.0</span>','<span id="download-version">'+html.escape(version)+'</span>')
+page=re.sub(r'(<span id="download-version">)[^<]*(</span>)',lambda m:m[1]+html.escape(version)+m[2],page)
 if protected:
     notice='<div class="build-notice" role="note"><strong>Registration required</strong><p>This installer requires your NOORI email and invitation key. Trial keys last 72 hours from first activation. Keep your internet connection on for registration checks.</p></div>'
     page=replace_region(page,'<!-- BUILD_NOTICE_START -->','<!-- BUILD_NOTICE_END -->',notice)
     page=page.replace('The current development preview does not enforce a trial.','Your owner controls trial and free full-access invitations.')
+    page=page.replace('The development preview does not require a key.','This download requires a personal invitation key.')
 else:
     # The shipped page must never advertise an unprotected build as a locked trial.
     if 'This download does not enforce serial activation or a three-day trial.' not in page:raise SystemExit('Unprotected build notice is missing.')
