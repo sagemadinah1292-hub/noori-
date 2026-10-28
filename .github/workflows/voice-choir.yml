@@ -1,5 +1,8 @@
-name: Voice Choir Windows x64
+name: NOORI CHOIR Windows x64
 on:
+  push:
+    branches: ['main']
+    paths: ['voice-choir/**', '.github/workflows/voice-choir.yml']
   pull_request:
     paths: ['voice-choir/**', '.github/workflows/voice-choir.yml']
   workflow_dispatch:
@@ -23,11 +26,28 @@ jobs:
       - name: Verify and package
         shell: pwsh
         run: ./voice-choir/scripts/Package.ps1
-      - name: Upload installable Windows package
+      - name: Compile and test Windows installer
+        shell: pwsh
+        run: ./voice-choir/scripts/BuildInstaller.ps1
+      - name: Upload installer and test evidence
         uses: actions/upload-artifact@v4
         with:
-          name: Noori-Voice-Choir-0.1.0-Windows-x64
-          path: dist-choir/Noori-Voice-Choir-0.1.0-Windows-x64.zip
+          name: NOORI-CHOIR-Setup-x64
+          path: |
+            dist-choir/NOORI_CHOIR_Setup_x64.exe
+            dist-choir/INSTALLER-TEST-RESULTS.json
+          if-no-files-found: error
+      - name: Upload tested Windows x64 VST3 package
+        uses: actions/upload-artifact@v4
+        with:
+          name: Noori-Choir-0.3.1-Windows-x64
+          path: dist-choir/Noori-Choir-0.3.1-Windows-x64.zip
+          if-no-files-found: error
+      - name: Upload UI previews
+        uses: actions/upload-artifact@v4
+        with:
+          name: NOORI-CHOIR-UI-Previews
+          path: build-choir/Preview*.png
           if-no-files-found: error
       - name: Upload test logs
         if: always()
