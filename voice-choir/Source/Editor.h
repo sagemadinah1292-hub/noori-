@@ -2,7 +2,7 @@
 #include "Plugin.h"
 class ChoirEditor final:public juce::AudioProcessorEditor,private juce::Timer,public juce::FileDragAndDropTarget {
 public:
- enum class Page {Import,Setup,Processing,Results,Settings};
+ enum class Page {Import,Setup,Processing,Results,Settings,Activation};
  explicit ChoirEditor(ChoirProcessor&);~ChoirEditor()override;
  void resized()override;void paint(juce::Graphics&)override;
  bool isInterestedInFileDrag(const juce::StringArray&)override;void filesDropped(const juce::StringArray&,int,int)override;
@@ -17,6 +17,8 @@ private:
  juce::TextButton back{"START OVER"},settingsButton{"SETTINGS"},browse{"BROWSE FILES"},capture{"CAPTURE FROM TRACK"},
  sourcePlay{"PLAY"},sourceMute{"M"},removeSource{"X"},create{"CREATE VOCALS"},cancel{"CANCEL"},
  playAll{"PLAY ALL"},stopAll{"STOP"},exportAll{"EXPORT STEMS"},exportMix{"EXPORT MIX"},openFolder{"OPEN FOLDER"};
+ juce::TextButton activationButton{"REGISTRATION / TRIAL"},activateKey{"ACTIVATE KEY"},checkKey{"CHECK ONLINE"},removeKey{"REMOVE LOCAL ACTIVATION"};
+ juce::TextEditor licenseEmail,licenseSerial;juce::Label licenseStatus,licenseExpiry,deviceLabel;bool lastLicensed=true;
  juce::ComboBox character,microphone,singers,key,scale,output,theme,scaling;
  std::array<juce::TextButton,6> parts;std::array<juce::TextButton,12> customNotes;
  juce::ToggleButton printFx{"PRINT POST FX TO STEMS"},floatWav{"32-bit float WAV (off = 24-bit PCM)"},bwf{"Include source BWF timestamp"};

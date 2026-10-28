@@ -1,0 +1,6 @@
+Options -Indexes
+RewriteEngine On
+RewriteRule ^(?:v1/(?:activate|check)|health)/?$ index.php [L]
+<FilesMatch "^(?:bootstrap\.php|.*\.(?:pem|jwk|sql|sqlite|db|json))$">
+  Require all denied
+</FilesMatch>

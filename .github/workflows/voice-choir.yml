@@ -2,9 +2,9 @@ name: NOORI CHOIR Windows x64
 on:
   push:
     branches: ['main']
-    paths: ['voice-choir/**', '.github/workflows/voice-choir.yml']
+    paths: ['voice-choir/**', 'activation-service/**', '.github/workflows/voice-choir.yml']
   pull_request:
-    paths: ['voice-choir/**', '.github/workflows/voice-choir.yml']
+    paths: ['voice-choir/**', 'activation-service/**', '.github/workflows/voice-choir.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -12,17 +12,87 @@ concurrency:
   group: voice-choir-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 jobs:
+  activation-php:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci-only-root-password
+          MYSQL_DATABASE: noori_test
+          MYSQL_USER: noori_ci
+          MYSQL_PASSWORD: ci-only-test-password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_mysql, pdo_sqlite, openssl
+      - name: PHP syntax checks
+        run: rg --files activation-service/php -g '*.php' -0 | xargs -0 -n1 php -l
+      - name: Test PHP service with MySQL
+        env:
+          NOORI_TEST_DSN: 'mysql:host=127.0.0.1;port=3306;dbname=noori_test;charset=utf8mb4'
+          NOORI_TEST_USER: noori_ci
+          NOORI_TEST_PASSWORD: ci-only-test-password
+        run: php activation-service/php/tests/service_test.php
+      - name: Test owner portal and PHP API over HTTP fixture
+        env:
+          NOORI_TEST_DSN: 'mysql:host=127.0.0.1;port=3306;dbname=noori_test;charset=utf8mb4'
+          NOORI_TEST_USER: noori_ci
+          NOORI_TEST_PASSWORD: ci-only-test-password
+        run: python3 activation-service/php/tests/http_test.py
+      - name: Test PHP service with isolated SQLite
+        run: php activation-service/php/tests/service_test.php
+      - name: Bundle Hostinger deployment files
+        run: python3 activation-service/scripts/package-hostinger.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NOORI-Activation-Hostinger
+          path: dist-activation/NOORI-Activation-Hostinger.zip
+          if-no-files-found: error
   build:
     runs-on: windows-2022
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Test activation service
+        run: node activation-service/test/worker.test.mjs
       - name: Configure Windows x64
         run: cmake -S voice-choir -B build-choir -G "Visual Studio 17 2022" -A x64
       - name: Compile VST3 and tests
         run: cmake --build build-choir --config Release --parallel 2
+      - name: Start ephemeral activation test service
+        shell: pwsh
+        run: |
+          $fixture=Join-Path (Get-Location) 'build-choir/license-fixture.json'
+          Start-Process node -ArgumentList 'activation-service/scripts/test-server.mjs', $fixture -RedirectStandardOutput 'build-choir/license-server.log' -RedirectStandardError 'build-choir/license-server.err'
+          $deadline=[DateTime]::UtcNow.AddSeconds(20)
+          while (!(Test-Path $fixture)) {
+            if ([DateTime]::UtcNow -gt $deadline) {throw 'Activation test service did not start'}
+            Start-Sleep -Milliseconds 100
+          }
       - name: Test DSP, processor and editor
         run: ctest --test-dir build-choir -C Release --output-on-failure
+      - name: Stop activation test service
+        if: always()
+        shell: pwsh
+        run: |
+          if (Test-Path 'build-choir/license-fixture.json') {
+            $fixture=Get-Content 'build-choir/license-fixture.json' -Raw | ConvertFrom-Json
+            Stop-Process -Id $fixture.pid -ErrorAction SilentlyContinue
+          }
       - name: Verify and package
         shell: pwsh
         run: ./voice-choir/scripts/Package.ps1
@@ -40,8 +110,8 @@ jobs:
       - name: Upload tested Windows x64 VST3 package
         uses: actions/upload-artifact@v4
         with:
-          name: Noori-Choir-0.3.1-Windows-x64
-          path: dist-choir/Noori-Choir-0.3.1-Windows-x64.zip
+          name: Noori-Choir-0.4.0-Windows-x64
+          path: dist-choir/Noori-Choir-0.4.0-Windows-x64.zip
           if-no-files-found: error
       - name: Upload UI previews
         uses: actions/upload-artifact@v4

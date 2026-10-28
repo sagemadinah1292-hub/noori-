@@ -1,0 +1,14 @@
+{
+  "name": "noori-friends-activation",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "node test/worker.test.mjs",
+    "keygen": "node scripts/admin.mjs keygen",
+    "issue": "node scripts/admin.mjs issue",
+    "start": "node src/server.mjs"
+  }
+}

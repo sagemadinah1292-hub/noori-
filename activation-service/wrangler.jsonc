@@ -1,0 +1,17 @@
+{
+  "name": "noori-friends-activation",
+  "main": "src/worker.mjs",
+  "compatibility_date": "2026-10-28",
+  "workers_dev": true,
+  "vars": { "ACCESS_POLICY": "online" },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "noori-friends-licenses",
+      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "triggers": { "crons": [ "17 3 * * *" ] },
+  "observability": { "enabled": false }
+}

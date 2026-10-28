@@ -1,11 +1,13 @@
 #pragma once
 #include <juce_audio_utils/juce_audio_utils.h>
 #include "WorkflowFiles.h"
+#include "Licensing.h"
 #include <thread>
 class ChoirProcessor final:public juce::AudioProcessor,private juce::AudioProcessorValueTreeState::Listener {
 public:
- ChoirProcessor();~ChoirProcessor()override;
+ explicit ChoirProcessor(noori_licensing::Config licensing=noori_licensing::buildConfig());~ChoirProcessor()override;
  juce::AudioProcessorValueTreeState state;
+ noori_licensing::Manager licensing;
  void prepareToPlay(double,int)override;void releaseResources()override{};void reset()override{stop();}
  void processBlock(juce::AudioBuffer<float>&,juce::MidiBuffer&)override;
  bool isBusesLayoutSupported(const BusesLayout&)const override;
@@ -49,6 +51,7 @@ private:
  juce::CriticalSection captureLock;juce::AudioBuffer<float> capture;std::atomic<bool> capturing{false},captureReady{false};
  std::atomic<int> capturedFrames{0};int captureChannels=1;juce::int64 captureOffset=0;
  std::function<void()> pendingJob;std::atomic<bool> shuttingDown{false};
+ bool requireLicense();
  void runJob(std::function<void()>,bool replace=false);void publish(std::shared_ptr<noori_choir::ChoirSession>,bool resetMix=false);
  void cacheSession(noori_choir::ChoirSession&);void restoreCache(juce::String,std::vector<noori_choir::StemMix>);
  void prepareDrop(const noori_choir::ChoirSession&);std::vector<noori_choir::StemMix> mixSnapshot(int)const;
