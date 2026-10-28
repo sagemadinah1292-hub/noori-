@@ -5,6 +5,7 @@ configuration or private files are copied into the public upload archive.
 """
 from pathlib import Path
 import argparse
+from datetime import datetime, timezone
 import hashlib
 import html
 import json
@@ -115,6 +116,12 @@ files['index.html']=page.encode()
 args.output.mkdir(parents=True,exist_ok=True)
 archive=args.output/'NOORI-Website-With-Plugin.zip'
 with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED) as z:
-    for name,data in files.items():z.writestr(name,data)
+    timestamp=datetime.now(timezone.utc).timetuple()[:6]
+    for name,data in files.items():
+        entry=zipfile.ZipInfo(name,timestamp)
+        entry.create_system=3
+        entry.external_attr=0o100644<<16
+        entry.compress_type=zipfile.ZIP_DEFLATED
+        z.writestr(entry,data)
 print('Created',archive,'with real Windows downloads; licensing enforced:',protected)
 print('No private activation configuration or signing keys included. Existing PHP service files are not replaced.')
