@@ -26,7 +26,7 @@ juce::StringArray ChoirProcessor::exportedFiles()const{const juce::ScopedLock lo
 void ChoirProcessor::runJob(std::function<void()> fn){
  bool expected=false;if(!busy.compare_exchange_strong(expected,true))return;
  if(worker.joinable())worker.join();cancelled=false;progress=0;
- {const juce::ScopedLock lock(offlineLock);status="Working…";}
+ {const juce::ScopedLock lock(offlineLock);status="Working...";}
  try{worker=std::thread([this,fn=std::move(fn)]{
   try{fn();}catch(const std::exception& e){const juce::ScopedLock lock(offlineLock);status=juce::String::fromUTF8(e.what());}
   catch(...){const juce::ScopedLock lock(offlineLock);status="Audio operation failed.";}

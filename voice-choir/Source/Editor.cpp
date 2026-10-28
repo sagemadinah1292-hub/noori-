@@ -67,12 +67,12 @@ void ChoirEditor::paint(Graphics& g){
  if(logo.isValid())g.drawImageWithin(logo,38,24,180,68,RectanglePlacement::centred,false);
  else if(brandLogo)brandLogo->drawWithin(g,Rectangle<float>(38,24,180,68),RectanglePlacement::centred,1.f);
  else {g.setColour(Colours::black);g.setFont(36.f);g.drawText("NOORI",38,22,180,48,Justification::centredLeft);}
- g.setFont(27.f);g.drawText("CHOIR",248,26,320,40,Justification::centredLeft);
+ g.setColour(text);g.setFont(27.f);g.drawText("CHOIR",248,26,320,40,Justification::centredLeft);
  g.setFont(14.f);g.drawText("Eight voices. One performance.",248,70,420,24,Justification::centredLeft);
  g.setColour(dark?Colour(0xff1b3430):Colour(0xffdceae0));g.fillRoundedRectangle(28,140,920,190,12);
  g.setColour(text);g.setFont(14.f);g.drawText("OFFLINE VOICES  /  Pitch spread and grain variation shape all eight exported voices",32,326,910,26,Justification::centredLeft);
  g.setColour(Colour(0xff52bca2));g.drawLine(28,548,948,548);
  g.setColour(text);g.setFont(14.f);g.drawText("Drop a WAV here, or Import WAV. Choose the folder containing your Cubase project.",32,562,916,26,Justification::centredLeft);
  g.drawText("Exports: NOORI CHOIR / eight 24-bit WAVs. Same sample rate, channels and duration as source.",32,588,916,26,Justification::centredLeft);
- g.setFont(12.f);g.drawText("Experimental DSP ensemble · No AI model · No ARA · Import exported files at the original event position",32,622,916,22,Justification::centredLeft);
+ g.setFont(12.f);g.drawText("Experimental DSP ensemble | No AI model | No ARA | Import exported files at the original event position",32,622,916,22,Justification::centredLeft);
 }

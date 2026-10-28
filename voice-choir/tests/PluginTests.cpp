@@ -15,6 +15,8 @@ int main(int argc,char**argv){try{juce::ScopedJuceInitialiser_GUI init;ChoirProc
   juce::Graphics g(image);editor->paintEntireComponent(g,true);
   check(image.getPixelAt(40*scale,150*scale)!=image.getPixelAt(5,5),"UI paints panel");
   int ink=0;for(int y=24*scale;y<92*scale;++y)for(int x=38*scale;x<218*scale;++x)if(image.getPixelAt(x,y).getBrightness()<.25f)++ink;check(ink>100*scale*scale,"Bundled NOORI logo rendered");
+  int titleInk=0;for(int y=26*scale;y<66*scale;++y)for(int x=248*scale;x<400*scale;++x){auto brightness=image.getPixelAt(x,y).getBrightness();if(dark?brightness>.6f:brightness<.35f)++titleInk;}
+  check(titleInk>30*scale*scale,"Title is readable in both themes");
   juce::PNGImageFormat png;auto file=out.getChildFile("Preview-"+juce::String(dark?"Dark":"Light")+"-"+juce::String(scale*100)+".png").createOutputStream();
   check(file&&png.writeImageToStream(image,*file),"GUI preview");file.reset();
   if(dark&&scale==1){auto defaultFile=out.getChildFile("Preview.png").createOutputStream();check(defaultFile&&png.writeImageToStream(image,*defaultFile),"Default preview");}

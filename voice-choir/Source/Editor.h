@@ -6,8 +6,8 @@ class ChoirEditor final : public juce::AudioProcessorEditor, private juce::Timer
  std::array<juce::Slider,6> knobs; std::array<juce::Label,6> labels;
  std::vector<std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>> attachments;
  juce::ComboBox presets, theme, scaling;
- juce::TextButton importButton{"Import WAV"}, exportButton{"Export 8 WAVs…"},
-                  cancelButton{"Cancel"}, revealButton{"Open export folder"}, logoButton{"Load NOORI logo…"};
+ juce::TextButton importButton{"Import WAV"}, exportButton{"Export 8 WAVs..."},
+                  cancelButton{"Cancel"}, revealButton{"Open export folder"}, logoButton{"Load NOORI logo..."};
  juce::Label source, status; juce::Image logo;std::unique_ptr<juce::Drawable> brandLogo;
  std::unique_ptr<juce::FileChooser> chooser;
  int scale=1; bool dark=true;
