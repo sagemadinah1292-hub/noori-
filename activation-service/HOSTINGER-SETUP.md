@@ -40,6 +40,11 @@ that this domain's TLS certificate has been verified.
 3. Compile with `NOORI_ENABLE_LICENSING=ON`, `NOORI_LICENSE_SERVER_URL` set to the
    URL above, and `NOORI_LICENSE_PUBLIC_KEY_HEX` set to that public modulus. CMake
    rejects an enabled build without HTTPS/public-key configuration.
+   For GitHub Actions, set these three repository **Actions variables** (public
+   configuration, not secrets): `NOORI_ENABLE_LICENSING=ON`,
+   `NOORI_LICENSE_SERVER_URL`, and `NOORI_LICENSE_PUBLIC_KEY_HEX`, then run the
+   Windows workflow. With no variables, Actions deliberately builds an
+   unprotected development installer; `BUILD-INFO.json` records that status.
 4. Test one trial key end to end on the live host, including expiry/device binding,
    before distributing the protected setup to friends. The unconfigured developer
    installer is not a substitute for this step.
