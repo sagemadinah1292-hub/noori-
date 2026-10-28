@@ -1,6 +1,6 @@
 param([string]$OutputDir='dist-choir')
 $ErrorActionPreference='Stop'
-$package=Join-Path $OutputDir 'Noori-Choir-0.3.0-Windows-x64'
+$package=Join-Path $OutputDir 'Noori-Choir-0.3.1-Windows-x64'
 $compiler=Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6/ISCC.exe'
 if (!(Test-Path $compiler)) {throw 'Inno Setup 6 is required to compile the installer.'}
 & $compiler "/DSourceDir=$((Resolve-Path $package).Path)" "/O$((Resolve-Path $OutputDir).Path)" 'voice-choir/scripts/Installer.iss'

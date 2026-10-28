@@ -76,6 +76,12 @@ inline Melody analyseMelody(const float* input,int frames,double rate,const std:
  }
  return result;
 }
+// Keep these indices stable so existing projects retain their voice character.
+inline const char* characterName(int index) {
+ static const char* names[]{"Gospel Choir","Children's Choir","Shout / Gang Choir",
+  "Nasheed / Naat Choir","Soft Emotional Choir","Male Choir","Female Choir","Mixed Choir"};
+ return names[std::clamp(index,0,7)];
+}
 struct Character { float formant, tilt, drive, level; };
 inline Character characterProfile(int n) {
  static const Character profiles[]{{0,1.5f,1.15f,.85f},{3.5f,3.f,1.f,.82f},{-.6f,2.f,1.8f,.72f},

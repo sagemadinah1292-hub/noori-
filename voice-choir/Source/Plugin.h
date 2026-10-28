@@ -32,7 +32,7 @@ public:
  bool capturePending()const{return captureReady.load();}double capturedSeconds()const{return capturedFrames.load()/hostRate.load();}
  int revision()const{return dataRevision.load();}
  std::atomic<bool> sourceMuted{false};
- std::atomic<bool> darkMode{true};std::atomic<int> uiScale{1};
+ std::atomic<bool> darkMode{true};std::atomic<int> uiScale{0};
 private:
  static juce::AudioProcessorValueTreeState::ParameterLayout layout();
  std::thread worker;std::atomic<bool> busy{false},cancelled{false};std::atomic<float> progress{0};

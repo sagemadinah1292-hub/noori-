@@ -1,4 +1,4 @@
-# NOORI CHOIR 0.3.0 — reference workflow development build
+# NOORI CHOIR 0.3.1 — reference workflow development build
 
 Native Windows x64 C++20/JUCE VST3, intended for Cubase Pro 15. No ARA. This
 revision replaces the six-knob chorus interface with a tall teal/gold workflow:
@@ -53,8 +53,9 @@ degrees while preserving expressive pitch offsets. Unvoiced audio is blended
 with the source. The original leading/trailing silence boundary is retained in
 dry stems. Source melody, not project tempo, defines musical timing.
 
-This is a **DSP choir/harmony engine, not a neural choir model**. Gospel, Kids,
-Shout, Naat, Soft Emotional, Male/Female/Mixed are audible formant/EQ/dynamics
+This is a **DSP choir/harmony engine, not a neural choir model**. Gospel Choir,
+Children's Choir, Shout / Gang Choir, Male Choir, Female Choir, Mixed Choir,
+Soft Emotional Choir and Nasheed / Naat Choir are audible formant/EQ/dynamics
 presets, not trained singers or microphone measurements. Timbre realism, octave
 artifacts, pitch detection on noisy/polyphonic sources and Urdu/Arabic diction
 require listening acceptance. No AI weights or GPU inference are included. See
@@ -76,9 +77,12 @@ retain/copy it when moving projects. Persistent caches and prepared drag takes
 are not automatically cleaned, so they consume disk space. Cancelled jobs can
 leave a completed, unused cache take; partial export files are cleaned up.
 
-Light/Dark and 100/200/300% scale are saved. Logical editor size is 720×1000,
-1440×2000 or 2160×3000 before host DPI scaling. Large scales need a suitable
-monitor. The original supplied SVG is included; its visible mark is embedded.
+Light/Dark and 75/100/200/300% scale are saved. New instances default to 75%
+(540×750). Existing saved 100/200/300% choices are preserved. The larger sizes
+are 720×1000, 1440×2000 and 2160×3000 before host DPI scaling. Large scales need a suitable
+monitor. The original supplied SVG is included; its visible mark is embedded and rendered
+in white on the gold header. A replacement white logo file is not required.
+The eight choir types are accessible on the opening screen and in Choir Setup.
 
 ## Build, tests and installer
 

@@ -26,7 +26,7 @@ private:
  std::vector<std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>> sliderAttachments;
  std::vector<std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment>> comboAttachments;
  std::vector<std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment>> buttonAttachments;
- Page page=Page::Import,returnPage=Page::Import;int lastRevision=-1,scaleFactor=1;bool dark=true;double fxChangedAt=0;
+ Page page=Page::Import,returnPage=Page::Import;int lastRevision=-1,lastScaleCode=-1;float scaleFactor=.75f;bool dark=true;double fxChangedAt=0;
  noori_choir::FxConfig renderedFx;
  void timerCallback()override;void paintPage(juce::Graphics&);void updateVisibility();void applyAppearance();void rebuildLanes();
  void chooseInput();void chooseExport(int);void hookSlider(juce::Slider&,const char*,double,double,const juce::String&);

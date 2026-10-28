@@ -40,8 +40,8 @@ jobs:
       - name: Upload tested Windows x64 VST3 package
         uses: actions/upload-artifact@v4
         with:
-          name: Noori-Choir-0.3.0-Windows-x64
-          path: dist-choir/Noori-Choir-0.3.0-Windows-x64.zip
+          name: Noori-Choir-0.3.1-Windows-x64
+          path: dist-choir/Noori-Choir-0.3.1-Windows-x64.zip
           if-no-files-found: error
       - name: Upload UI previews
         uses: actions/upload-artifact@v4

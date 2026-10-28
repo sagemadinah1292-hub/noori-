@@ -61,10 +61,10 @@ public:
  void mouseDrag(const MouseEvent& e)override{TextButton::mouseDrag(e);if(sent||e.getDistanceFromDragStart()<8||p.isBusy())return;auto files=p.dragFiles();if(files.isEmpty())return;sent=true;DragAndDropContainer::performExternalDragDropOfFiles(files,false,this);}
 };
 ChoirEditor::ChoirEditor(ChoirProcessor& processor):AudioProcessorEditor(processor),p(processor),look(std::make_unique<GoldLook>()),canvas(std::make_unique<Canvas>()),sourceWave(std::make_unique<WaveDisplay>()),stemsButton(std::make_unique<StemDragButton>(p)){
- setLookAndFeel(look.get());brandLogo=Drawable::createFromImageData(NooriBrand::NOORI_svg,NooriBrand::NOORI_svgSize);addAndMakeVisible(*canvas);canvas->draw=[this](Graphics& g){paintPage(g);};
+ setLookAndFeel(look.get());brandLogo=Drawable::createFromImageData(NooriBrand::NOORI_svg,NooriBrand::NOORI_svgSize);if(brandLogo)brandLogo->replaceColour(Colour(0xff18180c),Colours::white);addAndMakeVisible(*canvas);canvas->draw=[this](Graphics& g){paintPage(g);};
  auto add=[this](Component& c,const char* id){canvas->addAndMakeVisible(c);c.setComponentID(id);};
  add(back,"back");add(settingsButton,"settings");add(browse,"browse");add(capture,"capture");add(sourcePlay,"sourcePlay");add(sourceMute,"sourceMute");add(removeSource,"removeSource");add(create,"create");add(cancel,"cancel");add(playAll,"playAll");add(stopAll,"stopAll");add(exportAll,"exportAll");add(exportMix,"exportMix");add(openFolder,"openFolder");add(*stemsButton,"stems");add(*sourceWave,"sourceWave");add(sourceName,"sourceName");add(status,"status");add(progressLabel,"progress");add(viewport,"voices");viewport.setViewedComponent(&lanes,false);viewport.setScrollBarsShown(true,false);
- hookCombo(character,"character",{"Gospel","Kids","Shout","Naat Choir","Soft Emotional","Male Ensemble","Female Ensemble","Mixed Ensemble"});
+ StringArray choirTypes;for(int i=0;i<8;++i)choirTypes.add(characterName(i));hookCombo(character,"character",choirTypes);
  hookCombo(microphone,"microphone",{"Clean","Warm Vintage","Modern Studio","Warm Ribbon","Bright Condenser"});
  add(singers,"singers");for(int n:{2,4,6,8,12,16})singers.addItem(String(n)+" singers",n);singers.setSelectedId(int(p.value("voices")),dontSendNotification);singers.onChange=[this]{p.setValue("voices",float(singers.getSelectedId()));};
  hookCombo(key,"key",{"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"});hookCombo(scale,"scale",{"Major","Natural Minor","Harmonic Minor","Melodic Minor","Custom"});
@@ -78,7 +78,7 @@ ChoirEditor::ChoirEditor(ChoirProcessor& processor):AudioProcessorEditor(process
  for(auto* s:{&lowCut,&brightness,&reverb}){s->onDragEnd=[this]{if(p.stemCount()>0&&!p.isBusy()){renderedFx=p.fxConfig();p.applyFx();}};s->onValueChange=[this]{fxChangedAt=Time::getMillisecondCounterHiRes();};}
  add(printFx,"printFx");add(floatWav,"floatWav");add(bwf,"bwf");buttonAttachments.push_back(std::make_unique<AudioProcessorValueTreeState::ButtonAttachment>(p.state,"printFx",printFx));buttonAttachments.push_back(std::make_unique<AudioProcessorValueTreeState::ButtonAttachment>(p.state,"floatWav",floatWav));buttonAttachments.push_back(std::make_unique<AudioProcessorValueTreeState::ButtonAttachment>(p.state,"bwf",bwf));for(auto* b:{&printFx,&floatWav,&bwf})b->onClick=[this]{p.invalidateStems();};
  add(theme,"theme");theme.addItem("Dark Teal",1);theme.addItem("Light Teal",2);theme.setSelectedId(p.darkMode?1:2,dontSendNotification);theme.onChange=[this]{p.darkMode=theme.getSelectedId()==1;applyAppearance();};
- add(scaling,"scaling");for(int i=1;i<=3;++i)scaling.addItem(String(i*100)+"%",i);scaling.setSelectedId(p.uiScale,dontSendNotification);scaling.onChange=[this]{p.uiScale=scaling.getSelectedId();applyAppearance();};
+ add(scaling,"scaling");scaling.addItem("75%",4);for(int i=1;i<=3;++i)scaling.addItem(String(i*100)+"%",i);scaling.setSelectedId(p.uiScale==0?4:p.uiScale.load(),dontSendNotification);scaling.onChange=[this]{p.uiScale=scaling.getSelectedId()==4?0:scaling.getSelectedId();applyAppearance();};
  browse.onClick=[this]{chooseInput();};capture.onClick=[this]{if(p.isCapturing())p.stopCapture();else p.startCapture();};
  sourcePlay.onClick=[this]{if(p.isPlaying()&&p.playingVoice()==-2)p.stop();else p.play(-2);};sourceMute.setClickingTogglesState(true);sourceMute.onClick=[this]{p.sourceMuted=sourceMute.getToggleState();};
  removeSource.onClick=[this]{p.clearSource();showPage(Page::Import);};
@@ -95,13 +95,13 @@ ChoirEditor::~ChoirEditor(){stopTimer();chooser.reset();setLookAndFeel(nullptr);
 void ChoirEditor::hookSlider(Slider& s,const char* id,double low,double high,const String& suffix){canvas->addAndMakeVisible(s);s.setComponentID(id);s.setRange(low,high,.01);s.setSliderStyle(Slider::RotaryHorizontalVerticalDrag);s.setTextBoxStyle(Slider::TextBoxBelow,false,106,23);s.setTextValueSuffix(suffix);sliderAttachments.push_back(std::make_unique<AudioProcessorValueTreeState::SliderAttachment>(p.state,id,s));}
 void ChoirEditor::hookCombo(ComboBox& box,const char* id,StringArray items){canvas->addAndMakeVisible(box);box.setComponentID(id);int i=1;for(auto& item:items)box.addItem(item,i++);comboAttachments.push_back(std::make_unique<AudioProcessorValueTreeState::ComboBoxAttachment>(p.state,id,box));}
 void ChoirEditor::paint(Graphics& g){g.fillAll(Colour(0xff082d32));}
-void ChoirEditor::applyAppearance(){dark=p.darkMode;scaleFactor=std::clamp(p.uiScale.load(),1,3);look->setColour(Label::textColourId,dark?ink():Colour(0xff173b39));look->setColour(Slider::textBoxTextColourId,dark?ink():Colour(0xff173b39));look->setColour(ToggleButton::textColourId,dark?ink():Colour(0xff173b39));sourceName.setColour(Label::textColourId,dark?ink():Colour(0xff173b39));status.setColour(Label::textColourId,dark?ink():Colour(0xff173b39));progressLabel.setColour(Label::textColourId,dark?gold():Colour(0xff364721));setSize(720*scaleFactor,1000*scaleFactor);resized();sendLookAndFeelChange();repaint();}
+void ChoirEditor::applyAppearance(){dark=p.darkMode;lastScaleCode=std::clamp(p.uiScale.load(),0,3);scaleFactor=lastScaleCode==0?.75f:float(lastScaleCode);look->setColour(Label::textColourId,dark?ink():Colour(0xff173b39));look->setColour(Slider::textBoxTextColourId,dark?ink():Colour(0xff173b39));look->setColour(ToggleButton::textColourId,dark?ink():Colour(0xff173b39));sourceName.setColour(Label::textColourId,dark?ink():Colour(0xff173b39));status.setColour(Label::textColourId,dark?ink():Colour(0xff173b39));progressLabel.setColour(Label::textColourId,dark?gold():Colour(0xff364721));setSize(roundToInt(720*scaleFactor),roundToInt(1000*scaleFactor));resized();sendLookAndFeelChange();repaint();}
 void ChoirEditor::resized(){
  canvas->setBounds(0,0,720,1000);canvas->setTransform(AffineTransform::scale(float(scaleFactor)));
  back.setBounds(24,39,104,36);settingsButton.setBounds(608,39,88,36);
  sourcePlay.setBounds(22,137,57,35);sourceMute.setBounds(22,179,57,32);sourceWave->setBounds(90,132,604,83);removeSource.setBounds(652,139,34,28);sourceName.setBounds(88,218,606,30);
  if(page==Page::Import){browse.setBounds(234,620,252,48);capture.setBounds(234,690,252,42);}else {browse.setBounds(90,264,226,40);capture.setBounds(338,264,356,40);}
- character.setBounds(244,340,450,42);microphone.setBounds(244,395,450,42);singers.setBounds(244,450,212,42);output.setBounds(478,450,216,42);
+ if(page==Page::Import)character.setBounds(164,342,392,44);else character.setBounds(244,340,450,42);microphone.setBounds(244,395,450,42);singers.setBounds(244,450,212,42);output.setBounds(478,450,216,42);
  parts[0].setBounds(244,512,212,40);parts[1].setBounds(478,512,216,40);key.setBounds(244,572,212,40);scale.setBounds(478,572,216,40);
  parts[2].setBounds(244,627,212,40);parts[3].setBounds(478,627,216,40);parts[4].setBounds(244,682,212,40);parts[5].setBounds(478,682,216,40);
  create.setBounds(244,780,450,66);cancel.setBounds(250,715,220,44);progressLabel.setBounds(150,570,420,90);progressLabel.setFont(FontOptions(55.f));progressLabel.setJustificationType(Justification::centred);
@@ -115,7 +115,7 @@ void ChoirEditor::resized(){
 void ChoirEditor::showPage(Page next){page=next;updateVisibility();resized();canvas->repaint();}
 void ChoirEditor::updateVisibility(){for(int i=0;i<canvas->getNumChildComponents();++i)canvas->getChildComponent(i)->setVisible(false);settingsButton.setVisible(true);status.setVisible(true);back.setVisible(page==Page::Setup||page==Page::Results||page==Page::Settings);back.setButtonText(page==Page::Setup?"START OVER":"BACK");
  auto show=[](std::initializer_list<Component*> items){for(auto* c:items)c->setVisible(true);};
- if(page==Page::Import)show({&browse,&capture});
+ if(page==Page::Import)show({&browse,&capture,&character});
  if(page==Page::Setup){show({&browse,&capture,&sourcePlay,&sourceMute,&removeSource,sourceWave.get(),&sourceName,&character,&microphone,&singers,&key,&scale,&output,&create});for(auto& b:parts)b.setVisible(true);removeSource.toFront(false);}
  if(page==Page::Processing)show({&cancel,&progressLabel});
  if(page==Page::Results)show({&playAll,&stopAll,&masterGain,&viewport,&lowCut,&brightness,&reverb,&printFx,&exportAll,&exportMix,&openFolder,stemsButton.get()});
@@ -126,7 +126,7 @@ void ChoirEditor::timerCallback(){
  if(p.capturePending()&&!p.isBusy())p.stopCapture();
  if(p.revision()!=lastRevision){rebuildLanes();if(auto s=p.session())renderedFx=s->fx;if(page!=Page::Settings)showPage(p.stemCount()>0?Page::Results:p.hasSource()?Page::Setup:Page::Import);}
  if(page==Page::Processing&&!p.isBusy())showPage(p.stemCount()>0?Page::Results:p.hasSource()?Page::Setup:Page::Import);
- if(dark!=p.darkMode.load()||scaleFactor!=p.uiScale.load()){theme.setSelectedId(p.darkMode?1:2,dontSendNotification);scaling.setSelectedId(p.uiScale,dontSendNotification);applyAppearance();}
+ if(dark!=p.darkMode.load()||lastScaleCode!=p.uiScale.load()){theme.setSelectedId(p.darkMode?1:2,dontSendNotification);scaling.setSelectedId(p.uiScale==0?4:p.uiScale.load(),dontSendNotification);applyAppearance();}
  for(int n=0;n<12;++n)customNotes[n].setToggleState((int(p.value("customMask"))&(1<<n))!=0,dontSendNotification);
  status.setText(p.jobStatus()+(p.isBusy()?"  "+String(int(p.jobProgress()*100))+"%":""),dontSendNotification);progressLabel.setText(String(int(p.jobProgress()*100))+"%",dontSendNotification);
  sourceMute.setToggleState(p.sourceMuted,dontSendNotification);
@@ -155,6 +155,7 @@ void ChoirEditor::paintPage(Graphics& g){
  auto separator=[&](int y){g.setColour(Colour(0xff061e24));g.fillRect(0,y,720,4);g.setColour(Colours::white.withAlpha(.1f));g.fillRect(0,y+4,720,1);};
  separator(116);
  if(page==Page::Import){g.setColour(foreground);g.setFont(FontOptions(27.f));g.drawFittedText("Transform One Voice Into a Choir",35,155,650,46,Justification::centred,2);g.setFont(FontOptions(16.f));g.drawText("Import a vocal. Choose its parts. Create and audition your choir.",24,207,672,40,Justification::centred);
+  g.setColour(foreground);g.setFont(FontOptions(17.f));g.drawText("CHOIR TYPE",164,300,392,30,Justification::centred);g.setFont(FontOptions(12.f));g.drawText("Eight DSP character presets - choose before creating vocals",112,394,496,24,Justification::centred);
   g.setColour(Colours::white.withAlpha(.3f));auto r=Rectangle<float>(20,274,680,622);for(int x=28;x<690;x+=16){g.drawLine(float(x),274,float(x+7),274);g.drawLine(float(x),896,float(x+7),896);}for(int y=282;y<890;y+=16){g.drawLine(20,float(y),20,float(y+7));g.drawLine(700,float(y),700,float(y+7));}
   bevel(g,Rectangle<float>(312,492,96,96),Colour(0xffeddb74),Colour(0xff8a6d19),48);g.setColour(Colour(0xff5d3020));Path arrow;arrow.addTriangle(348,522,348,559,377,541);g.fillPath(arrow);
   g.setColour(foreground);g.setFont(FontOptions(25.f));g.drawText("Drop your vocals to start",70,760,580,44,Justification::centred);g.setFont(FontOptions(14.f));g.drawText("WAV / AIFF  |  Mono / Stereo  |  Processed locally",50,829,620,30,Justification::centred);ignoreUnused(r);
