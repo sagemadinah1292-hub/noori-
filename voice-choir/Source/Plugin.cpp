@@ -15,8 +15,8 @@ AudioProcessorValueTreeState::ParameterLayout ChoirProcessor::layout(){
  toggle("printFx","Print Post FX",true);toggle("floatWav","32 bit float export",false);toggle("bwf","BWF source timestamp",true);
  return p;
 }
-ChoirProcessor::ChoirProcessor():AudioProcessor(BusesProperties().withInput("Vocal",AudioChannelSet::stereo(),true).withOutput("Choir Preview",AudioChannelSet::stereo(),true)),state(*this,nullptr,"NooriVoiceChoir",layout()){master=state.getRawParameterValue("masterGain");}
-ChoirProcessor::~ChoirProcessor(){shuttingDown=true;capturing=false;cancelled=true;{const ScopedLock lock(dataLock);pendingJob={};}if(worker.joinable())worker.join();}
+ChoirProcessor::ChoirProcessor():AudioProcessor(BusesProperties().withInput("Vocal",AudioChannelSet::stereo(),true).withOutput("Choir Preview",AudioChannelSet::stereo(),true)),state(*this,nullptr,"NooriVoiceChoir",layout()){master=state.getRawParameterValue("masterGain");for(auto id:{"lowCut","brightness","reverb","printFx","floatWav","bwf"})state.addParameterListener(id,this);}
+ChoirProcessor::~ChoirProcessor(){for(auto id:{"lowCut","brightness","reverb","printFx","floatWav","bwf"})state.removeParameterListener(id,this);shuttingDown=true;capturing=false;cancelled=true;{const ScopedLock lock(dataLock);pendingJob={};}if(worker.joinable())worker.join();}
 float ChoirProcessor::value(const char* id)const{auto* v=state.getRawParameterValue(id);return v?v->load():0.f;}
 void ChoirProcessor::setValue(const String& id,float v){if(auto* p=state.getParameter(id)){p->beginChangeGesture();p->setValueNotifyingHost(p->convertTo0to1(v));p->endChangeGesture();}}
 ChoirConfig ChoirProcessor::config()const{ChoirConfig c;c.singers=int(value("voices"));c.character=int(value("character"));c.microphone=int(value("microphone"));c.key=int(value("key"));c.scale=int(value("scale"));c.customMask=int(value("customMask"));c.variation=value("detune");c.octaveUp=value("octaveUp")>.5f;c.octaveDown=value("octaveDown")>.5f;c.thirdAbove=value("thirdAbove")>.5f;c.thirdBelow=value("thirdBelow")>.5f;c.fifthAbove=value("fifthAbove")>.5f;c.fifthBelow=value("fifthBelow")>.5f;c.stereo=value("stereo")>.5f;return c;}
@@ -60,9 +60,9 @@ bool ChoirProcessor::hasSource()const{auto s=session();return s&&s->source;}
 int ChoirProcessor::stemCount()const{auto s=session();return s?int(s->stems.size()):0;}
 String ChoirProcessor::jobStatus()const{const ScopedLock lock(dataLock);return status;}
 StringArray ChoirProcessor::exportedFiles()const{const ScopedLock lock(dataLock);return exports;}
-StringArray ChoirProcessor::dragFiles()const{const ScopedLock lock(dataLock);return dragDirty?StringArray{}:dropFiles;}
+StringArray ChoirProcessor::dragFiles()const{const ScopedLock lock(dataLock);return stemsNeedPreparation()?StringArray{}:dropFiles;}
 StemMix ChoirProcessor::stemMix(int v)const{if(v<0||v>=16)return {};return {mixes[v].gain.load(),mixes[v].pan.load(),mixes[v].mute.load(),mixes[v].solo.load()};}
-void ChoirProcessor::setStemMix(int v,StemMix m){if(v<0||v>=16)return;mixes[v].gain=std::clamp(m.gain,-60.f,12.f);mixes[v].pan=std::clamp(m.pan,-1.f,1.f);mixes[v].mute=m.mute;mixes[v].solo=m.solo;dragDirty=true;}
+void ChoirProcessor::setStemMix(int v,StemMix m){if(v<0||v>=16)return;mixes[v].gain=std::clamp(m.gain,-60.f,12.f);mixes[v].pan=std::clamp(m.pan,-1.f,1.f);mixes[v].mute=m.mute;mixes[v].solo=m.solo;invalidateStems();}
 std::vector<StemMix> ChoirProcessor::mixSnapshot(int n)const{std::vector<StemMix> result;for(int i=0;i<n;++i)result.push_back(stemMix(i));return result;}
 void ChoirProcessor::runJob(std::function<void()> fn,bool replace){
  {const ScopedLock lock(dataLock);if(busy){if(replace){pendingJob=std::move(fn);cancelled=true;}return;}busy=true;cancelled=false;progress=0;status="Working...";}
@@ -92,8 +92,8 @@ void ChoirProcessor::cacheSession(ChoirSession& s){
 }
 void ChoirProcessor::prepareDrop(const ChoirSession& s){
  auto folder=cacheRoot().getChildFile("DragFiles");if(folder.createDirectory().failed())throw std::runtime_error("Cannot prepare drag files.");
- auto files=exportSession(s,folder,mixSnapshot(int(s.stems.size())),value("floatWav")>.5f?32:24,value("printFx")>.5f,value("bwf")>.5f,-1,cancelled,progress);
- const ScopedLock lock(dataLock);dropFiles=std::move(files);dragDirty=false;
+ const auto revision=mixRevision.load();auto files=exportSession(s,folder,mixSnapshot(int(s.stems.size())),value("floatWav")>.5f?32:24,value("printFx")>.5f,value("bwf")>.5f,-1,cancelled,progress);
+ const ScopedLock lock(dataLock);dropFiles=std::move(files);preparedMixRevision=revision;dragDirty=false;
 }
 void ChoirProcessor::importWav(File file){if(isCapturing())return;stop();runJob([this,file]{auto s=std::make_shared<ChoirSession>();s->source=std::make_shared<VocalFile>(readWav(file,cancelled));s->config=config();s->fx=fxConfig();cacheSession(*s);publish(s,true);progress=1;const ScopedLock lock(dataLock);status="Vocal loaded. Choose choir parts and Create Vocals.";});}
 void ChoirProcessor::generate(int regenerate){if(isCapturing())return;const auto c=config();const auto fx=fxConfig();stop();runJob([this,c,fx,regenerate]{

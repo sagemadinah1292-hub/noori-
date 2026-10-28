@@ -50,7 +50,7 @@ public:
   play.onClick=[this]{if(p.isPlaying()&&p.playingVoice()==index)p.stop();else p.play(index);};remove.onClick=[this]{p.removeStem(index);};regenerate.onClick=[this]{p.generate(index);};exportOne.onClick=[this]{if(onExport)onExport(index);};
  }
  void resized()override{wave.setBounds(78,8,getWidth()-164,64);name.setBounds(78,76,getWidth()-170,22);play.setBounds(3,8,68,32);mute.setBounds(3,44,32,28);solo.setBounds(38,44,32,28);gain.setBounds(78,103,252,26);pan.setBounds(352,103,208,26);remove.setBounds(getWidth()-76,8,66,26);regenerate.setBounds(getWidth()-76,38,66,26);exportOne.setBounds(getWidth()-76,70,66,26);}
- void refresh(){wave.position=p.isPlaying()?p.playhead():-1;wave.repaint();auto enabled=!p.isBusy();remove.setEnabled(enabled);regenerate.setEnabled(enabled);exportOne.setEnabled(enabled);play.setToggleState(p.isPlaying()&&p.playingVoice()==index,dontSendNotification);}
+ void refresh(){auto position=p.isPlaying()?p.playhead():-1;if(wave.position!=position){wave.position=position;wave.repaint();}auto enabled=!p.isBusy();remove.setEnabled(enabled);regenerate.setEnabled(enabled);exportOne.setEnabled(enabled);play.setToggleState(p.isPlaying()&&p.playingVoice()==index,dontSendNotification);}
  void paint(Graphics& g)override{g.setColour(Colours::black.withAlpha(.3f));g.drawHorizontalLine(getHeight()-1,0,float(getWidth()));g.setColour(ink().withAlpha(.65f));g.setFont(FontOptions(9.f));g.drawText("GAIN",78,130,252,12,Justification::centred);g.drawText("PAN",352,130,208,12,Justification::centred);}
 };
 class ChoirEditor::StemDragButton final:public TextButton {
@@ -135,11 +135,11 @@ void ChoirEditor::timerCallback(){
  for(auto* control:std::initializer_list<Component*>{&lowCut,&brightness,&reverb,&printFx,&floatWav,&bwf})control->setEnabled(!p.isBusy());
  back.setEnabled(!p.isBusy()&&!p.isCapturing());create.setEnabled(!p.isBusy()&&!p.isCapturing());
  stemsButton->setEnabled(!p.isBusy()&&p.stemCount()>0);stemsButton->setButtonText(p.stemsNeedPreparation()?"PREPARE STEMS":"STEMS - DRAG TO CUBASE");
- for(auto& row:rows)row->refresh();sourceWave->position=p.isPlaying()&&p.playingVoice()==-2?p.playhead():-1;sourceWave->repaint();
+ for(auto& row:rows)row->refresh();auto position=p.isPlaying()&&p.playingVoice()==-2?p.playhead():-1;if(sourceWave->position!=position){sourceWave->position=position;sourceWave->repaint();}
  if(p.stemCount()>0&&!p.isBusy()){
   const auto fx=p.fxConfig();if(fx.lowCut!=renderedFx.lowCut||fx.brightness!=renderedFx.brightness||fx.reverb!=renderedFx.reverb){if(fxChangedAt==0)fxChangedAt=Time::getMillisecondCounterHiRes();if(!lowCut.isMouseButtonDown()&&!brightness.isMouseButtonDown()&&!reverb.isMouseButtonDown()&&Time::getMillisecondCounterHiRes()-fxChangedAt>500){renderedFx=fx;p.applyFx();}}
  }
- canvas->repaint();
+ if(page==Page::Processing&&p.isBusy())canvas->repaint();
 }
 void ChoirEditor::chooseInput(){if(chooser||p.isBusy()||p.isCapturing())return;chooser=std::make_unique<FileChooser>("Choose vocal WAV or AIFF",File(),"*.wav;*.aif;*.aiff");Component::SafePointer<ChoirEditor> safe(this);chooser->launchAsync(FileBrowserComponent::openMode|FileBrowserComponent::canSelectFiles,[safe](const FileChooser& fc){if(!safe)return;auto file=fc.getResult();if(file.existsAsFile()){safe->p.importWav(file);safe->showPage(Page::Processing);}safe->chooser.reset();});}
 void ChoirEditor::chooseExport(int selected){if(chooser||p.isBusy())return;chooser=std::make_unique<FileChooser>("Choose Cubase project directory",File(),"",true);Component::SafePointer<ChoirEditor> safe(this);chooser->launchAsync(FileBrowserComponent::openMode|FileBrowserComponent::canSelectDirectories,[safe,selected](const FileChooser& fc){if(!safe)return;auto dir=fc.getResult();if(dir.isDirectory())safe->p.exportTo(dir,selected);safe->chooser.reset();});}

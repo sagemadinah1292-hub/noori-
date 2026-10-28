@@ -2,7 +2,7 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 #include "WorkflowFiles.h"
 #include <thread>
-class ChoirProcessor final:public juce::AudioProcessor {
+class ChoirProcessor final:public juce::AudioProcessor,private juce::AudioProcessorValueTreeState::Listener {
 public:
  ChoirProcessor();~ChoirProcessor()override;
  juce::AudioProcessorValueTreeState state;
@@ -27,7 +27,7 @@ public:
  void play(int voice=-1);void stop();bool isPlaying()const{return playbackMode.load()!=-3;}
  double playhead()const{return previewFrame.load();}int playingVoice()const{return playbackMode.load();}
  void setStemMix(int,noori_choir::StemMix);noori_choir::StemMix stemMix(int)const;
- bool stemsNeedPreparation()const{return dragDirty.load();}void invalidateStems(){dragDirty=true;}
+ bool stemsNeedPreparation()const{return dragDirty.load()||preparedMixRevision.load()!=mixRevision.load();}void invalidateStems(){++mixRevision;dragDirty=true;}
  void startCapture();void stopCapture();bool isCapturing()const{return capturing.load();}
  bool capturePending()const{return captureReady.load();}double capturedSeconds()const{return capturedFrames.load()/hostRate.load();}
  int revision()const{return dataRevision.load();}
@@ -38,6 +38,8 @@ private:
  std::thread worker;std::atomic<bool> busy{false},cancelled{false};std::atomic<float> progress{0};
  mutable juce::CriticalSection dataLock;std::shared_ptr<const noori_choir::ChoirSession> current;
  juce::String status="Drop a vocal or browse files to begin.";juce::StringArray exports,dropFiles;
+ void parameterChanged(const juce::String&,float)override{invalidateStems();}
+ std::atomic<unsigned long long> mixRevision{0},preparedMixRevision{~0ULL};
  std::atomic<int> dataRevision{0};std::atomic<bool> dragDirty{true};
  mutable juce::CriticalSection previewLock;std::shared_ptr<const noori_choir::ChoirSession> preview;
  std::atomic<int> playbackMode{-3};std::atomic<bool> rewind{false};double cursor=0;
