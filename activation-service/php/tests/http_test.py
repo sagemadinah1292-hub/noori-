@@ -53,9 +53,10 @@ with tempfile.TemporaryDirectory(prefix='noori-php-http-') as temp:
         cookie=headers.get('set-cookie',cookie).split(';')[0]
         status,headers,data=call('/admin.php');assert status==200 and b'Generate invitations' in data,'Owner dashboard'
         current_csrf=csrf(data)
-        status,headers,data=call('/admin.php',{'csrf':current_csrf,'action':'generate','count':'20','kind':'trial','email':''})
+        assert call('/admin.php',{'csrf':current_csrf,'action':'generate','count':'20','kind':'trial','email':''})[0]==400,'Unassigned batch keys denied in approval workflow'
+        status,headers,data=call('/admin.php',{'csrf':current_csrf,'action':'generate','count':'1','kind':'trial','email':'friend@example.com'})
         assert status==200 and headers.get('content-type','').startswith('text/csv'),'CSV generation'
-        keys=list(csv.DictReader(io.StringIO(data.decode())));assert len(keys)==20 and len({x['Serial'] for x in keys})==20,'20 unique keys downloaded'
+        keys=list(csv.DictReader(io.StringIO(data.decode())));assert len(keys)==1 and keys[0]['Email']=='friend@example.com','One owner-approved email-assigned key downloaded'
         status,_,page=call('/admin.php');assert all(k['Serial'].encode() not in page for k in keys),'Full keys not shown in owner list'
         assert call('/admin.php',{'csrf':current_csrf,'action':'generate','count':'20','kind':'trial'})[0]==403,'Old form cannot replay key generation'
         current_csrf=csrf(call('/admin.php')[2])
@@ -72,6 +73,6 @@ with tempfile.TemporaryDirectory(prefix='noori-php-http-') as temp:
         assert call('/admin.php',{'csrf':current_csrf,'action':'revoke','id':keys[0]['Owner record ID']})[0]==200,'Owner disables key'
         assert call('/v1/check',raw=json.dumps(body))[0]==403,'Disabled key rejected'
         assert call('/signing-private.pem')[0]==404,'Private key not publicly served'
-        print('PASS PHP HTTP setup, HTTPS requirement, secure owner session, CSRF, 20-key CSV, email/computer binding and owner grant/revoke')
+        print('PASS PHP HTTP setup, HTTPS requirement, secure owner session, CSRF, email-assigned final key CSV, email/computer binding and owner grant/revoke')
     finally:
         server.terminate();server.wait(timeout=5);log.close()

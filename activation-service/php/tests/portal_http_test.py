@@ -42,10 +42,11 @@ with tempfile.TemporaryDirectory(prefix='noori-portal-apache-') as tmp:
     processes.append(subprocess.Popen(['php','-S',f'127.0.0.1:{backend_port}',str(router)],cwd=app,stdout=backend_log,stderr=backend_log))
     # This test-only proxy rule runs after the shipped deny and route rules.
     with (app/'.htaccess').open('a') as f:f.write(f'\nRewriteRule ^(.*\\.php)$ http://127.0.0.1:{backend_port}/noori-activation/$1 [P,L]\n')
+    module_dir=os.environ.get('NOORI_APACHE_MODULES','/usr/lib/apache2/modules')
     modules=['mpm_event','authz_core','authz_host','dir','mime','rewrite','proxy','proxy_http','headers']
     (tmp/'run').mkdir()
     conf=tmp/'apache.conf'
-    conf.write_text('\n'.join([f'ServerRoot "{tmp}"',f'DefaultRuntimeDir "{tmp}/run"',f'PidFile "{tmp}/apache.pid"',f'Listen 127.0.0.1:{apache_port}','ServerName localhost',*[f'LoadModule {m}_module {os.environ.get('NOORI_APACHE_MODULES','/usr/lib/apache2/modules')}/mod_{m}.so' for m in modules],f'ErrorLog "{tmp}/apache-error.log"','LogLevel warn','TypesConfig /etc/mime.types',f'DocumentRoot "{public}"',f'<Directory "{public}">','AllowOverride All','Require all granted','</Directory>', 'ProxyRequests Off','RequestHeader set X-Noori-Test-Request "expr=%{THE_REQUEST}"'])+'\n')
+    conf.write_text('\n'.join([f'ServerRoot "{tmp}"',f'DefaultRuntimeDir "{tmp}/run"',f'PidFile "{tmp}/apache.pid"',f'Listen 127.0.0.1:{apache_port}','ServerName localhost',*[f'LoadModule {m}_module {module_dir}/mod_{m}.so' for m in modules],f'ErrorLog "{tmp}/apache-error.log"','LogLevel warn','TypesConfig /etc/mime.types',f'DocumentRoot "{public}"',f'<Directory "{public}">','AllowOverride All','Require all granted','</Directory>', 'ProxyRequests Off','RequestHeader set X-Noori-Test-Request "expr=%{THE_REQUEST}"'])+'\n')
     apache_log=open(tmp/'apache.log','w+');logs.append(apache_log)
     processes.append(subprocess.Popen([os.environ.get('NOORI_APACHE_BIN','apache2'),'-f',str(conf),'-DFOREGROUND'],stdout=apache_log,stderr=apache_log))
     owner=Browser(apache_port);friend=Browser(apache_port);anonymous=Browser(apache_port)

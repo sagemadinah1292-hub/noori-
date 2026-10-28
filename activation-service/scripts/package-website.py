@@ -109,11 +109,14 @@ guide="""NOORI FINAL PORTAL UPGRADE — preserve your existing setup
    private backup. Nothing is deleted. Unrelated .private, default.php and llms.txt
    are preserved. The root .htaccess is backed up and receives a NOORI archive guard.
    Resolve any reported errors before allowing friends to download.
-6. Generate ONE trial invitation assigned to your own email. Keep its CSV private.
-   Use an incognito window: register an email, continue to Create password,
-   then finish registration. The authenticated USER dashboard opens. A partial
-   registration does not grant download access. Keep the original invitation
-   for plugin activation.
+6. In an incognito window register your email, then create a password. Your
+   account must show Awaiting owner approval and downloads must return 403.
+   In the owner dashboard set your authorized hosting sender email under
+   Registration notifications. Recipient defaults to shahidulhaq@live.com.
+   Retry notification and verify real inbox receipt; server acceptance is not
+   delivery confirmation. Generate ONE key assigned to the requesting email,
+   keep its CSV private, and enter that final key in the user dashboard.
+   Only then should the installer download. Use the same key in the plugin.
 7. While signed out verify dashboard.php and download.php?file=installer ask for
    sign-in. Old /downloads/...exe and NOORI-Website-With-Plugin.zip links at BOTH
    the domain root and /noori-activation must return 403 or 404.
