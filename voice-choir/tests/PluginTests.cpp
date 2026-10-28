@@ -1,25 +1,24 @@
 #include "Plugin.h"
 #include "Editor.h"
 #include <iostream>
-void check(bool b,const char*s){if(!b)throw std::runtime_error(s);}
-int main(int argc,char**argv){try{juce::ScopedJuceInitialiser_GUI init;ChoirProcessor p;p.setRateAndBufferSizeDetails(48000,256);p.prepareToPlay(48000,256);check(p.getLatencySamples()==1920,"Reported latency");p.preset(2);juce::MemoryBlock state;p.getStateInformation(state);ChoirProcessor restored;restored.setStateInformation(state.getData(),int(state.getSize()));check(restored.settings().voices==16&&restored.settings().gain==-6&&restored.settings().width==100,"Preset save restore");
- juce::AudioProcessor::BusesLayout layout;layout.inputBuses.add(juce::AudioChannelSet::mono());layout.outputBuses.add(juce::AudioChannelSet::stereo());check(p.setBusesLayout(layout),"Mono to stereo support");p.prepareToPlay(48000,256);juce::MidiBuffer midi;juce::AudioBuffer<float>b(2,256);double energy=0;for(int n=0;n<16000;n+=256){for(int i=0;i<256;++i){b.setSample(0,i,float(.2*std::sin((n+i)*.035)));b.setSample(1,i,123.f);}p.processBlock(b,midi);for(int i=0;i<256;++i){check(std::isfinite(b.getSample(1,i))&&std::abs(b.getSample(1,i))<1,"Mono input output cleared and rendered");energy+=b.getSample(1,i)*b.getSample(1,i);}}check(energy>.1,"Audible plugin output");
- std::unique_ptr<juce::AudioProcessorEditor> editor(p.createEditor());check(editor&&editor->getWidth()==980,"Editor constructed");check(dynamic_cast<ChoirEditor*>(editor.get())->hasBrandLogo(),"Bundled vector logo decoded");editor->setVisible(true);bool preset=false;for(int i=0;i<editor->getNumChildComponents();++i)if(auto* c=dynamic_cast<juce::ComboBox*>(editor->getChildComponent(i));c&&c->getName().isEmpty()){c->setSelectedId(1,juce::dontSendNotification);c->onChange();preset=true;}check(preset&&p.settings().voices==4,"GUI preset applies");
- auto out=argc>1?juce::File(argv[1]):juce::File::getCurrentWorkingDirectory();out.createDirectory();for(bool dark:{true,false})for(int scale:{1,2,3}){
-  for(int i=0;i<editor->getNumChildComponents();++i)if(auto* c=dynamic_cast<juce::ComboBox*>(editor->getChildComponent(i))){
-   if(c->getName()=="Colour theme"){c->setSelectedId(dark?1:2,juce::dontSendNotification);c->onChange();}
-   if(c->getName()=="Interface scale"){c->setSelectedId(scale,juce::dontSendNotification);c->onChange();}
-  }
-  check(editor->getWidth()==980*scale&&editor->getHeight()==660*scale,"UI scale applied");
-  juce::Image image(juce::Image::ARGB,editor->getWidth(),editor->getHeight(),true,juce::SoftwareImageType{});
-  juce::Graphics g(image);editor->paintEntireComponent(g,true);
-  check(image.getPixelAt(40*scale,150*scale)!=image.getPixelAt(5,5),"UI paints panel");
-  int ink=0;for(int y=24*scale;y<92*scale;++y)for(int x=38*scale;x<218*scale;++x)if(image.getPixelAt(x,y).getBrightness()<.25f)++ink;check(ink>100*scale*scale,"Bundled NOORI logo rendered");
-  int titleInk=0;for(int y=26*scale;y<66*scale;++y)for(int x=248*scale;x<400*scale;++x){auto brightness=image.getPixelAt(x,y).getBrightness();if(dark?brightness>.6f:brightness<.35f)++titleInk;}
-  check(titleInk>30*scale*scale,"Title is readable in both themes");
-  juce::PNGImageFormat png;auto file=out.getChildFile("Preview-"+juce::String(dark?"Dark":"Light")+"-"+juce::String(scale*100)+".png").createOutputStream();
-  check(file&&png.writeImageToStream(image,*file),"GUI preview");file.reset();
-  if(dark&&scale==1){auto defaultFile=out.getChildFile("Preview.png").createOutputStream();check(defaultFile&&png.writeImageToStream(image,*defaultFile),"Default preview");}
+void check(bool b,const char* message){if(!b)throw std::runtime_error(message);}
+void wait(ChoirProcessor& p){double end=juce::Time::getMillisecondCounterHiRes()+240000;while(p.isBusy()){check(juce::Time::getMillisecondCounterHiRes()<end,"Worker timeout");juce::Thread::sleep(2);}}
+juce::Component* find(juce::Component& root,const juce::String& id){if(root.getComponentID()==id)return &root;for(int i=0;i<root.getNumChildComponents();++i)if(auto* result=find(*root.getChildComponent(i),id))return result;return nullptr;}
+int main(int argc,char** argv){try{using namespace juce;using namespace noori_choir;ScopedJuceInitialiser_GUI init;auto out=argc>1?File(argv[1]):File::getCurrentWorkingDirectory();out.createDirectory();
+ ChoirProcessor p;p.setRateAndBufferSizeDetails(48000,256);p.prepareToPlay(48000,256);check(p.getLatencySamples()==0,"Offline workflow uses transparent zero-latency insert");
+ std::unique_ptr<ChoirEditor> editor(static_cast<ChoirEditor*>(p.createEditor()));check(editor->hasBrandLogo(),"Supplied SVG decoded");check(editor->getWidth()==720&&editor->getHeight()==1000,"Reference-oriented tall editor");
+ auto capture=[&](const String& file){Image image(Image::ARGB,editor->getWidth(),editor->getHeight(),true,SoftwareImageType{});Graphics g(image);editor->paintEntireComponent(g,true);PNGImageFormat png;auto stream=out.getChildFile(file).createOutputStream();check(stream&&png.writeImageToStream(image,*stream),"Actual editor screenshot");};
+ for(bool dark:{true,false})for(int scale:{1,2,3}){
+  auto* theme=dynamic_cast<ComboBox*>(find(*editor,"theme"));auto* scaling=dynamic_cast<ComboBox*>(find(*editor,"scaling"));check(theme&&scaling,"Appearance controls");theme->setSelectedId(dark?1:2,dontSendNotification);theme->onChange();scaling->setSelectedId(scale,dontSendNotification);scaling->onChange();check(editor->getWidth()==720*scale&&editor->getHeight()==1000*scale,"Requested UI scales");
+  editor->showPage(ChoirEditor::Page::Import);capture("Preview-Import-"+String(dark?"Dark":"Light")+"-"+String(scale*100)+".png");
  }
- p.darkMode=false;p.uiScale=3;juce::MemoryBlock uiState;p.getStateInformation(uiState);restored.setStateInformation(uiState.getData(),int(uiState.getSize()));check(!restored.darkMode&&restored.uiScale==3,"Appearance saved in host state");
- out.getChildFile("choir-tests.ok").replaceWithText("Engine and processor/editor tests passed. Cubase acceptance listening not yet performed.\n");std::cout<<"PASS processor, state, mono/stereo routing, UI preset and preview\n";return 0;}catch(const std::exception&e){std::cerr<<e.what()<<'\n';return 1;}}
+ auto* scaling=dynamic_cast<ComboBox*>(find(*editor,"scaling"));scaling->setSelectedId(1,dontSendNotification);scaling->onChange();auto* theme=dynamic_cast<ComboBox*>(find(*editor,"theme"));theme->setSelectedId(1,dontSendNotification);theme->onChange();
+ VocalFile fixture;fixture.rate=48000;fixture.name="Reference vocal";fixture.audio.setSize(1,48000);for(int i=0;i<48000;++i)fixture.audio.setSample(0,i,float(.25*std::sin(2*pi*196*i/48000.)));std::atomic<bool> cancelled{false};auto file=out.getChildFile("UI-Vocal.wav");writeWave(file,fixture,32,false,cancelled);
+ p.importWav(file);wait(p);editor.reset(static_cast<ChoirEditor*>(p.createEditor()));editor->showPage(ChoirEditor::Page::Setup);capture("Preview-Setup.png");
+ auto* create=dynamic_cast<TextButton*>(find(*editor,"create"));check(create&&create->onClick,"Create Vocals connected");create->onClick();capture("Preview-Processing.png");wait(p);check(p.stemCount()==8,"Create button generates eight parts");
+ editor.reset(static_cast<ChoirEditor*>(p.createEditor()));editor->showPage(ChoirEditor::Page::Results);capture("Preview-Results.png");capture("Preview.png");
+ auto* play=dynamic_cast<TextButton*>(find(*editor,"playAll"));check(play&&play->onClick,"Play All connected");play->onClick();check(p.isPlaying(),"Results playback action");p.stop();
+ editor->showPage(ChoirEditor::Page::Settings);capture("Preview-Settings.png");
+ p.darkMode=false;p.uiScale=3;MemoryBlock state;p.getStateInformation(state);ChoirProcessor restored;restored.setStateInformation(state.getData(),int(state.getSize()));wait(restored);check(!restored.darkMode&&restored.uiScale==3&&restored.stemCount()==8,"Appearance and audio restore");
+ file.deleteFile();check(out.getChildFile("choir-tests.ok").replaceWithText("PASS supplied logo, reference workflow pages, six appearance combinations, Create/Play actions and audio restore.\n"),"UI test marker");std::cout<<"PASS reference workflow editor and project state\n";return 0;
+}catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}

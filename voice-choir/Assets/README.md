@@ -1,4 +1,7 @@
-NOORI.svg is copied from assets/Noori Tempo Track.svg in this repository at
-commit 122f20352f227edbbb8f2c877e6fc6333ac93bfa (tempo development branch).
-The path geometry is preserved. JUCE BinaryData embeds this vector in the plugin.
-The editor renders it on a light plate for visibility in both themes.
+NOORI-original.svg is the exact user-supplied "logo of noori.svg".
+NOORI.svg preserves its visible path geometry and text, removes Illustrator's
+invisible giant clipping shapes, and crops the canvas to the visible brand.
+The named Poppins font is replaced with a sans-serif fallback for the small
+SHAHID UL HAQ label, so that it can display without installing a font.
+The original vector is retained unchanged for future typography refinements.
+The plugin embeds NOORI.svg with JUCE BinaryData.

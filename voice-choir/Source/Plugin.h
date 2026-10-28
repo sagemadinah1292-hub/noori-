@@ -1,33 +1,53 @@
 #pragma once
 #include <juce_audio_utils/juce_audio_utils.h>
-#include "ChoirEngine.h"
-#include "OfflineFiles.h"
+#include "WorkflowFiles.h"
 #include <thread>
 class ChoirProcessor final:public juce::AudioProcessor {
 public:
- ChoirProcessor();~ChoirProcessor()override;juce::AudioProcessorValueTreeState state;
- void prepareToPlay(double,int)override;void releaseResources()override{};void reset()override{clearRequested=true;}
+ ChoirProcessor();~ChoirProcessor()override;
+ juce::AudioProcessorValueTreeState state;
+ void prepareToPlay(double,int)override;void releaseResources()override{};void reset()override{stop();}
  void processBlock(juce::AudioBuffer<float>&,juce::MidiBuffer&)override;
  bool isBusesLayoutSupported(const BusesLayout&)const override;
  juce::AudioProcessorEditor* createEditor()override;bool hasEditor()const override{return true;}
  const juce::String getName()const override{return "NOORI CHOIR";}
  bool acceptsMidi()const override{return false;}bool producesMidi()const override{return false;}bool isMidiEffect()const override{return false;}
- double getTailLengthSeconds()const override{return .15;}
- int getNumPrograms()override{return 1;}int getCurrentProgram()override{return 0;}void setCurrentProgram(int)override{}const juce::String getProgramName(int)override{return "Default";}void changeProgramName(int,const juce::String&)override{}
+ double getTailLengthSeconds()const override{return 0;}
+ int getNumPrograms()override{return 1;}int getCurrentProgram()override{return 0;}void setCurrentProgram(int)override{}
+ const juce::String getProgramName(int)override{return "NOORI Naat";}void changeProgramName(int,const juce::String&)override{}
  void getStateInformation(juce::MemoryBlock&)override;void setStateInformation(const void*,int)override;
- void setValue(const juce::String&,float);void preset(int);noori_choir::Settings settings()const;
- void importWav(juce::File);void exportTo(juce::File);
- void cancelJob(){cancelled=true;}
- bool isBusy()const{return busy.load();}
- float jobProgress()const{return progress.load();}
- juce::String jobStatus()const;juce::String sourceDescription()const;
- bool hasSource()const;juce::StringArray exportedFiles()const;
+ void setValue(const juce::String&,float);float value(const char*)const;
+ noori_choir::ChoirConfig config()const;noori_choir::FxConfig fxConfig()const;
+ void importWav(juce::File);void generate(int regenerate=-1);void applyFx();void prepareStems();
+ void exportTo(juce::File,int selected=-1);void clearSource();void removeStem(int);
+ void cancelJob(){cancelled=true;}bool isBusy()const{return busy.load();}float jobProgress()const{return progress.load();}
+ juce::String jobStatus()const;bool hasSource()const;int stemCount()const;
+ std::shared_ptr<const noori_choir::ChoirSession> session()const;
+ juce::StringArray exportedFiles()const;juce::StringArray dragFiles()const;
+ void play(int voice=-1);void stop();bool isPlaying()const{return playbackMode.load()!=-3;}
+ double playhead()const{return previewFrame.load();}int playingVoice()const{return playbackMode.load();}
+ void setStemMix(int,noori_choir::StemMix);noori_choir::StemMix stemMix(int)const;
+ bool stemsNeedPreparation()const{return dragDirty.load();}void invalidateStems(){dragDirty=true;}
+ void startCapture();void stopCapture();bool isCapturing()const{return capturing.load();}
+ bool capturePending()const{return captureReady.load();}double capturedSeconds()const{return capturedFrames.load()/hostRate.load();}
+ int revision()const{return dataRevision.load();}
+ std::atomic<bool> sourceMuted{false};
  std::atomic<bool> darkMode{true};std::atomic<int> uiScale{1};
 private:
- std::thread worker;std::atomic<bool> busy{false},cancelled{false};std::atomic<float> progress{0};
- mutable juce::CriticalSection offlineLock;std::shared_ptr<const noori_choir::VocalFile> vocal;
- juce::String status="Import a vocal WAV to begin.";juce::StringArray exports;
- void runJob(std::function<void()>);
- noori_choir::Engine engine;std::atomic<bool> clearRequested{false};std::array<std::atomic<float>*,6> values{};
  static juce::AudioProcessorValueTreeState::ParameterLayout layout();
+ std::thread worker;std::atomic<bool> busy{false},cancelled{false};std::atomic<float> progress{0};
+ mutable juce::CriticalSection dataLock;std::shared_ptr<const noori_choir::ChoirSession> current;
+ juce::String status="Drop a vocal or browse files to begin.";juce::StringArray exports,dropFiles;
+ std::atomic<int> dataRevision{0};std::atomic<bool> dragDirty{true};
+ mutable juce::CriticalSection previewLock;std::shared_ptr<const noori_choir::ChoirSession> preview;
+ std::atomic<int> playbackMode{-3};std::atomic<bool> rewind{false};double cursor=0;
+ std::atomic<double> previewFrame{0},hostRate{48000};
+ struct AtomicMix {std::atomic<float> gain{0},pan{0};std::atomic<bool> mute{false},solo{false};};
+ std::array<AtomicMix,16> mixes;std::atomic<float>* master=nullptr;
+ juce::CriticalSection captureLock;juce::AudioBuffer<float> capture;std::atomic<bool> capturing{false},captureReady{false};
+ std::atomic<int> capturedFrames{0};int captureChannels=1;juce::int64 captureOffset=0;
+ std::function<void()> pendingJob;std::atomic<bool> shuttingDown{false};
+ void runJob(std::function<void()>,bool replace=false);void publish(std::shared_ptr<noori_choir::ChoirSession>,bool resetMix=false);
+ void cacheSession(noori_choir::ChoirSession&);void restoreCache(juce::String,std::vector<noori_choir::StemMix>);
+ void prepareDrop(const noori_choir::ChoirSession&);std::vector<noori_choir::StemMix> mixSnapshot(int)const;
 };

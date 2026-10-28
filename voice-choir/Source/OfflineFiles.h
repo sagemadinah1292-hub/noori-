@@ -9,14 +9,15 @@ struct VocalFile {
  juce::AudioBuffer<float> audio;
  double rate = 0;
  juce::String name;
+ juce::String originalPath;juce::int64 sampleOffset=0;
 };
 // A bounded in-memory import. Reject rather than truncate unsupported/huge input.
 inline VocalFile readWav(const juce::File& file, const std::atomic<bool>& cancelled) {
- if (!file.hasFileExtension("wav")) throw std::runtime_error("Select a WAV file.");
- juce::WavAudioFormat format;
+ if (!file.hasFileExtension("wav;aif;aiff")) throw std::runtime_error("Select a WAV or AIFF file.");
+ juce::AudioFormatManager formats;formats.registerBasicFormats();
  auto stream = file.createInputStream();
  if (!stream) throw std::runtime_error("Cannot open WAV file.");
- std::unique_ptr<juce::AudioFormatReader> reader(format.createReaderFor(stream.release(), true));
+ std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(std::move(stream)));
  if (!reader || reader->sampleRate < 8000 || reader->sampleRate > 384000
      || reader->lengthInSamples <= 0 || reader->numChannels < 1 || reader->numChannels > 2)
   throw std::runtime_error("Use a valid mono or stereo WAV (8–384 kHz).");
@@ -25,6 +26,7 @@ inline VocalFile readWav(const juce::File& file, const std::atomic<bool>& cancel
   throw std::runtime_error("WAV exceeds the 512 MiB decoded audio limit. Split the source first.");
  VocalFile result;
  result.rate = reader->sampleRate; result.name = file.getFileNameWithoutExtension();
+ result.originalPath=file.getFullPathName();result.sampleOffset=reader->metadataValues.getValue("bwav time reference","0").getLargeIntValue();
  result.audio.setSize(int(reader->numChannels), int(reader->lengthInSamples));
  for (int offset = 0; offset < result.audio.getNumSamples(); offset += 8192) {
   if (cancelled) throw std::runtime_error("Cancelled.");

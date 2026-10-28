@@ -1,47 +1,111 @@
-# NOORI CHOIR 0.2.0 — experimental
+# NOORI CHOIR 0.3.0 — reference workflow development build
 
-C++20 / JUCE Windows x64 VST3, intended for Cubase Pro 15. No ARA.
-Modified 2026-10-28. AGPL-3.0; see LICENSE and dependency notices.
+Native Windows x64 C++20/JUCE VST3, intended for Cubase Pro 15. No ARA. This
+revision replaces the six-knob chorus interface with a tall teal/gold workflow:
+Import → Choir Setup → Processing → Results, using the supplied NOORI SVG.
 
-## Offline workflow
+## Workflow
 
-1. Insert NOORI CHOIR on a vocal track. Import a mono/stereo WAV with **Import WAV**, or drop one WAV onto the editor. PCM and IEEE-float WAV decoding uses JUCE's WAV reader. The source is read locally; no upload or network processing occurs.
-2. Choose Pitch spread and Grain variation, or a starting preset. Offline export always renders **eight separate voices**. The four controls labelled LIVE affect only the live insert; blend, gain, width and live voice count do not change stems.
-3. Click **Export 8 WAVs…** and select the existing directory containing your Cubase project (not the .cpr file).
-4. Eight uniquely named 24-bit WAVs are written directly inside `<project>/NOORI CHOIR/`. Repeated exports keep previous takes. **Open export folder** opens that directory.
-5. Import all eight files into Cubase and place their starts at the original vocal event's start. Files retain source sample rate, mono/stereo channel count, exact sample count and leading/trailing silence. Export does not infer the event's position on the Cubase timeline. If the source was bounced from the project origin, place all files at that origin.
+1. Browse/drop a WAV or AIFF, or click **CAPTURE FROM TRACK**, play the vocal in
+   Cubase, then **STOP CAPTURE**. Source waveform, playback and mute are available.
+   Capture has a 120-second limit; pause/seek discontinuities are captured exactly
+   as received, so record a continuous section. Direct Cubase audio-event drops
+   may not provide ordinary file paths; file browse and track capture are fallbacks.
+2. Choose the number of singers, DSP choir character, microphone tone, key/scale,
+   octaves, thirds and fifths. Main plus selected musical parts occupy the first
+   slots; remaining singers are unison variations. Reduce selected parts if they
+   exceed the number of singers. Key is manual. Scales: major, natural minor,
+   harmonic minor and ascending melodic minor.
+3. **CREATE VOCALS** analyzes pitch and renders separate formant-compensated
+   musical parts. Progress reflects work. Cancellation keeps the preceding result.
+4. Audition source or generated voices through the plugin's output in the host.
+   Results show actual waveforms, Play All/Stop, master gain, and per-voice play,
+   mute, solo, gain, pan, regenerate, delete and WAV export. The host must run its
+   audio callback for audition. When idle the insert passes track audio through.
+5. Adjust Lo-Cut, Brightness and Reverb. Effects render in the background on slider
+   release; playback restarts after rendering. **PRINT POST FX TO STEMS** selects
+   processed or dry files. The reverb tail is contained within the original duration.
+6. Drag **STEMS — DRAG TO CUBASE** into the DAW, or **EXPORT STEMS** to your chosen
+   project directory's **NOORI CHOIR** folder. Eight singers produce eight files.
+   Multi-file Windows dragging is implemented using JUCE's native file/OLE path;
+   actual Cubase acceptance, track creation and timeline placement remain untested.
+   **EXPORT MIX** explicitly makes one combined file. It does not replace stems.
+7. Changing per-voice controls or export options invalidates prepared drag files.
+   Click **PREPARE STEMS** before dragging again. Completed drag files persist in
+   the local cache and are not deleted during the drag operation.
 
-The engine uses independently detuned, centred overlapping grains with per-voice drift and amplitude variation. It does not progressively stretch words or add a tail. Source silence and sharp attacks are retained; pitch/grain variation can still colour sustained vocals. Duration and event position are preserved, not every waveform sample. This is conventional DSP, **not an AI choir model**, distinct trained singers, formant synthesis, or generated harmony.
+Exports retain exact source frame count and sample rate. Output channels follow
+Mono/Stereo. Choose 24-bit PCM or 32-bit IEEE float in Settings. Optional BWF
+metadata retains an imported WAV's sample reference or the capture's reported
+host sample position. A file without a timestamp defaults to zero. BWF metadata
+alone does not guarantee DAW placement: align all file starts with the original
+event or use the host's timestamp import command where appropriate. Individual
+stems print per-voice gain and stereo pan; mute/solo apply to audition and mix
+export, not removal of individual files. Mix export includes a 1/sqrt(N) gain
+factor. Leave mix headroom; float files can retain samples above full scale,
+whereas 24-bit PCM is limited to full scale.
 
-Import and export use a background worker. Cancel removes incomplete output; an export is published only after all eight renders finish. A publication failure rolls back files from that attempt. A process crash during publication can leave partial files; crash-atomic multi-file publication is not implemented. Source WAVs are never overwritten. Inputs are limited to mono/stereo, 8–384 kHz, and 512 MiB decoded float data; invalid/non-finite audio is rejected. Samples outside full scale are limited during export. Reimport audio after reopening a project: imported samples and selected export directory are not embedded in plugin state.
+## Engine and limitations
 
-## Interface
+Signalsmith Stretch provides spectral pitch shifting and formant compensation.
+A YIN-style detector tracks monophonic pitch. Diatonic harmony moves between scale
+degrees while preserving expressive pitch offsets. Unvoiced audio is blended
+with the source. The original leading/trailing silence boundary is retained in
+dry stems. Source melody, not project tempo, defines musical timing.
 
-Select Light/Dark and 100%/200%/300%. These settings and processing controls are saved in host plugin state. The largest logical editor is 2940 × 1980; host DPI scaling can increase its physical size further, so it may exceed a monitor.
+This is a **DSP choir/harmony engine, not a neural choir model**. Gospel, Kids,
+Shout, Naat, Soft Emotional, Male/Female/Mixed are audible formant/EQ/dynamics
+presets, not trained singers or microphone measurements. Timbre realism, octave
+artifacts, pitch detection on noisy/polyphonic sources and Urdu/Arabic diction
+require listening acceptance. No AI weights or GPU inference are included. See
+[neural technology review](docs/NEURAL-ENGINE-REVIEW.md).
 
-The existing NOORI vector logo from the repository’s tempo branch is bundled and displayed on a light plate in both themes. Its original path geometry is retained. **Load NOORI logo…** optionally displays a user-selected PNG/JPEG with preserved aspect ratio. A custom logo’s local path is saved; that file must remain available on that computer. The bundled vector requires no external file.
+Import is limited to mono/stereo, 8–384 kHz, 512 MiB decoded audio. Generation
+rejects configurations exceeding an estimated 512 MiB for source plus dry/wet
+voices. FFT and temporary buffers add overhead. Use shorter files/fewer voices.
+Custom scales and automatic key detection are not implemented in this revision.
 
-## Live insert
+## Project persistence
 
-The previous 2–16 voice stereo ensemble is retained. Pitch spread and grain variation also control its pitch/timing spread. LIVE width, blend and output affect the insert. It reports 40 ms nominal latency to the host. Mono, mono-to-stereo and stereo routing are supported. Live and offline algorithms differ; stems do not sum to an exact reproduction of the live insert.
+Parameters, appearance, singer mix and the persistent cache ID are saved in host
+state. Lossless source and dry voices live in the current Windows user's
+`AppData/Roaming/NOORI CHOIR/Cache` (JUCE user-application-data directory). Reopen
+restores them and rerenders FX in the background. Missing caches report a recovery
+message. The cache is not embedded in the .cpr and is not portable by itself;
+retain/copy it when moving projects. Persistent caches and prepared drag takes
+are not automatically cleaned, so they consume disk space. Cancelled jobs can
+leave a completed, unused cache take; partial export files are cleaned up.
 
-## Build and verification
+Light/Dark and 100/200/300% scale are saved. Logical editor size is 720×1000,
+1440×2000 or 2160×3000 before host DPI scaling. Large scales need a suitable
+monitor. The original supplied SVG is included; its visible mark is embedded.
 
-Use Visual Studio 2022 with Desktop C++ tools, CMake >=3.24, and Git:
+## Build, tests and installer
+
+Visual Studio 2022 Desktop C++, CMake >=3.24, Git:
 
 ```powershell
 cmake -S voice-choir -B build-choir -G "Visual Studio 17 2022" -A x64
 cmake --build build-choir --config Release --parallel 2
 ctest --test-dir build-choir -C Release --output-on-failure
 ./voice-choir/scripts/Package.ps1
+./voice-choir/scripts/BuildInstaller.ps1
 ```
 
-JUCE is pinned by commit. The workflow builds only Windows x64 VST3 and uploads a ZIP after engine, offline, WAV I/O, processor/state, and editor tests pass. Package.ps1 checks the AMD64 PE header, test markers and actual UI previews. The ZIP includes exact project sources and licensing; BUILD-INFO.json records its commit and unverified host status. It is an experimental bundle, not a verified Windows installer. Copy the entire `NOORI CHOIR.vst3` directory into `%CommonProgramFiles%\VST3` while Cubase is closed. Install.bat is a copy helper requiring suitable permissions; its interactive installation has not been tested.
+The installer script requires Inno Setup 6. CI compiles it and silently installs
+into an isolated runner directory, checks the installed VST3 hash, uninstalls and
+checks preservation of unrelated files. Consult the actual workflow results:
+these checks do not establish interactive desktop installation or Cubase
+compatibility. The installer is unsigned. Default installation is the shared
+`C:\Program Files\Common Files\VST3` directory. Close Cubase first.
 
-Portable DSP tests can be built with `-DCHOIR_BUILD_PLUGIN=OFF`, or compiled directly using g++ and the Source include directory. Windows tests generate six screenshots at both themes and all three scales.
+Tests cover actual musical output frequencies, WAV/AIFF decode, eight stems,
+PCM/float/BWF export, preview/mute, FX processing, cache restoration, restore during
+a render, capture sample counting, regeneration/deletion, and editor pages with
+all themes/scales. CI supplies real screenshots, compiled VST3, corresponding
+project sources and installer test evidence. Cubase 15 tests are not marked as
+passed without a real Cubase session. See [host acceptance](docs/CUBASE-ACCEPTANCE.md).
 
-## Remaining acceptance work
-
-Actual Cubase Pro 15 loading, playback, delay compensation, project restore, file dialog/drop behaviour, listening quality and high-DPI usability require a Windows/Cubase session. External WAV drop into the plugin is implemented but not verified in Cubase. Dragging eight generated files from the plugin directly into Cubase, automatic track creation, project-folder discovery, tempo/event-position transfer, ARA and timeline placement are **not implemented**. Use Cubase's file import or Explorer workflow manually. There is no AI model, GPU inference, singer identity/formant model, or verified installer.
-
-Source: https://github.com/sagemadinah1292-hub/noori- . Use the commit in BUILD-INFO.json for the exact revision.
+AGPL-3.0; vendored Signalsmith components are MIT. JUCE and VST3 notices are bundled.
+Source: https://github.com/sagemadinah1292-hub/noori- . BUILD-INFO.json identifies
+the exact checkout used for a binary.
