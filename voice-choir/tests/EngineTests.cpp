@@ -13,3 +13,4 @@ int main(){try{for(double rate:{44100.,48000.,96000.}){
  // An impulse must finish within the bounded grain buffer, with no word-length drift.
  a.reset();x.assign(40000,0);x[0]=1;a.process(x.data(),nullptr,40000,s);for(int i=int(rate*.15);i<40000;++i)check(x[i]==0,"Finite tail / no cumulative stretch");
  }std::cout<<"PASS choir dry latency, stereo ensemble, bounded output, reset, mono, block partition and finite tail\n";return 0;}catch(const std::exception&e){std::cerr<<e.what()<<'\n';return 1;}}
+
