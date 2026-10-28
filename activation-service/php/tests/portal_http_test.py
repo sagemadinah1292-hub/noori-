@@ -29,10 +29,11 @@ with tempfile.TemporaryDirectory(prefix='noori-portal-apache-') as tmp:
     tmp=Path(tmp);public=tmp/'public_html';app=public/'noori-activation';private=tmp/'noori-private'
     shutil.copytree(root/'public',app);shutil.copytree(root/'private',private)
     bootstrap=app/'bootstrap.php';bootstrap.write_text(bootstrap.read_text().replace('/CHANGE_TO_YOUR_HOME_DIRECTORY/noori-private',str(private)))
+    if os.environ.get('NOORI_TEST_DSN','').startswith('sqlite:'):(private/'schema.mysql.sql').write_text('') # Tables already created by service tests.
     token='test-setup-'+'a'*64;password='Owner-password-12345!'
     (private/'config.php').write_text("<?php return ['dsn'=>getenv('NOORI_TEST_DSN'),'db_user'=>getenv('NOORI_TEST_USER'),'db_password'=>getenv('NOORI_TEST_PASSWORD'),'public_url'=>'https://activation.test/noori-activation','setup_token'=>'"+token+"','access_policy'=>'online'];")
     # The preceding SQL/service tests have created the legacy tables.
-    (tmp/'clear.php').write_text("<?php $p=new PDO(getenv('NOORI_TEST_DSN'),getenv('NOORI_TEST_USER'),getenv('NOORI_TEST_PASSWORD'));$p->exec('DELETE FROM noori_accounts;DELETE FROM noori_licenses;DELETE FROM noori_rate_limits');")
+    (tmp/'clear.php').write_text("<?php $p=new PDO(getenv('NOORI_TEST_DSN'),getenv('NOORI_TEST_USER'),getenv('NOORI_TEST_PASSWORD'));$p->exec('DELETE FROM noori_requests;DELETE FROM noori_accounts;DELETE FROM noori_licenses;DELETE FROM noori_rate_limits');")
     subprocess.run(['php',str(tmp/'clear.php')],check=True)
     backend_port=port();apache_port=port();logs=[];processes=[]
     router=tmp/'router.php'
@@ -44,9 +45,9 @@ with tempfile.TemporaryDirectory(prefix='noori-portal-apache-') as tmp:
     modules=['mpm_event','authz_core','authz_host','dir','mime','rewrite','proxy','proxy_http','headers']
     (tmp/'run').mkdir()
     conf=tmp/'apache.conf'
-    conf.write_text('\n'.join([f'ServerRoot "{tmp}"',f'DefaultRuntimeDir "{tmp}/run"',f'PidFile "{tmp}/apache.pid"',f'Listen 127.0.0.1:{apache_port}','ServerName localhost',*[f'LoadModule {m}_module /usr/lib/apache2/modules/mod_{m}.so' for m in modules],f'ErrorLog "{tmp}/apache-error.log"','LogLevel warn','TypesConfig /etc/mime.types',f'DocumentRoot "{public}"',f'<Directory "{public}">','AllowOverride All','Require all granted','</Directory>', 'ProxyRequests Off','RequestHeader set X-Noori-Test-Request "expr=%{THE_REQUEST}"'])+'\n')
+    conf.write_text('\n'.join([f'ServerRoot "{tmp}"',f'DefaultRuntimeDir "{tmp}/run"',f'PidFile "{tmp}/apache.pid"',f'Listen 127.0.0.1:{apache_port}','ServerName localhost',*[f'LoadModule {m}_module {os.environ.get('NOORI_APACHE_MODULES','/usr/lib/apache2/modules')}/mod_{m}.so' for m in modules],f'ErrorLog "{tmp}/apache-error.log"','LogLevel warn','TypesConfig /etc/mime.types',f'DocumentRoot "{public}"',f'<Directory "{public}">','AllowOverride All','Require all granted','</Directory>', 'ProxyRequests Off','RequestHeader set X-Noori-Test-Request "expr=%{THE_REQUEST}"'])+'\n')
     apache_log=open(tmp/'apache.log','w+');logs.append(apache_log)
-    processes.append(subprocess.Popen(['apache2','-f',str(conf),'-DFOREGROUND'],stdout=apache_log,stderr=apache_log))
+    processes.append(subprocess.Popen([os.environ.get('NOORI_APACHE_BIN','apache2'),'-f',str(conf),'-DFOREGROUND'],stdout=apache_log,stderr=apache_log))
     owner=Browser(apache_port);friend=Browser(apache_port);anonymous=Browser(apache_port)
     try:
         for _ in range(100):
@@ -80,7 +81,7 @@ with tempfile.TemporaryDirectory(prefix='noori-portal-apache-') as tmp:
         assert anonymous.call(base+'/downloads.5773/NOORI_CHOIR_Setup_x64.exe')[0] in [403,404],'Apache denies suffixed download folders'
         assert anonymous.call(base+'/NOORI-Website-With-Plugin.zip')[0]==403,'Apache denies uploaded website archive'
         assert anonymous.call(base+'/bootstrap.php')[0]==403,'Apache denies helper source'
-        assert anonymous.call(base+'/download.php?file=installer')[0]==303,'Anonymous file endpoint requires sign-in'
+        result=anonymous.call(base+'/download.php?file=installer');assert result[0]==303,('Anonymous file endpoint requires sign-in',result)
         assert anonymous.call(base+'/dashboard.php')[0]==303,'Anonymous account endpoint requires sign-in'
         assert owner.call(base+'/admin.php')[0]==303,'Owner route redirects to common sign-in'
         status,headers,page=owner.call(base+'/login.php')
@@ -100,6 +101,14 @@ with tempfile.TemporaryDirectory(prefix='noori-portal-apache-') as tmp:
         assert anonymous.call(base+'/create-password.php')[0]==303,'Password step requires verified registration details'
         status,_,page=friend.call(base+'/create-password.php');assert status==200 and b'STEP 2 OF 2' in page and key.encode() not in page,'Password step contains no raw serial'
         status,headers,_=friend.call(base+'/create-password.php',{'csrf':csrf(page),'password':'Friend-password-123!','confirm':'Friend-password-123!','role':'owner'});assert status==303 and headers['location']=='dashboard.php','Completed registration selects user dashboard, ignoring forged role'
+        _,_,pending=friend.call(base+'/dashboard.php');assert b'Awaiting owner approval' in pending
+        assert friend.call(base+'/download.php?file=installer')[0]==403,'Registered account cannot download before owner key'
+        _,_,review=owner.call(base+'/admin.php');assert b'friend@example.com' in review and b'not_sent' in review,'Owner sees pending request and honest unsent notification'
+        assert friend.call(base+'/admin.php',{'csrf':csrf(pending),'action':'notification-settings','sender':'intruder@example.com'})[0]==403,'Only owner can set mail sender'
+        assert friend.call(base+'/dashboard.php',{'csrf':csrf(pending),'serial':'NOORI-F-'+'F'*32})[0]==403,'Invented key cannot approve account'
+        _,_,pending=friend.call(base+'/dashboard.php')
+        assert friend.call(base+'/dashboard.php',{'csrf':csrf(pending),'serial':key})[0]==303,'Owner email-assigned key unlocks account'
+
         assert friend.call(base+'/admin.php')[0]==403 and friend.call(base+'/secure-downloads.php')[0]==403,'User cannot open owner pages'
         _,_,user_page=friend.call(base+'/dashboard.php')
         assert friend.call(base+'/admin.php',{'csrf':csrf(user_page),'action':'generate','count':'20','kind':'full'})[0]==403,'User cannot execute owner actions with their own valid CSRF token'

@@ -110,7 +110,7 @@ guide="""NOORI FINAL PORTAL UPGRADE — preserve your existing setup
    are preserved. The root .htaccess is backed up and receives a NOORI archive guard.
    Resolve any reported errors before allowing friends to download.
 6. Generate ONE trial invitation assigned to your own email. Keep its CSV private.
-   Use an incognito window: register email + serial, continue to Create password,
+   Use an incognito window: register an email, continue to Create password,
    then finish registration. The authenticated USER dashboard opens. A partial
    registration does not grant download access. Keep the original invitation
    for plugin activation.

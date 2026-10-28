@@ -9,5 +9,8 @@ return [
  'setup_token' => 'CHANGE_TO_A_RANDOM_SECRET_OF_AT_LEAST_32_CHARACTERS',
  // online: check on launch and renew a 15-minute signed session.
  // activation: full-access keys may run offline; trials still validate online.
+ // Recipient of new-account notifications. Sender must be authorized on your hosting.
+ 'owner_notification_email' => 'shahidulhaq@live.com',
+ 'notification_from' => '', // Set your actual domain mailbox; never use the visitor address.
  'access_policy' => 'online'
 ];
