@@ -24,3 +24,13 @@ with zipfile.ZipFile(output / 'NOORI-Page-Only.zip', 'w', zipfile.ZIP_DEFLATED) 
     for name in ['index.html', '.htaccess', 'assets/site.css', 'assets/noori-logo.svg']:
         archive.write(public / name, name)
 print('Created page-only ZIP for an existing noori-activation folder; API/config files are not included.')
+
+# Separate uploads let owners add activation without replacing the live download page.
+for name, folder, allowlist in [
+    ('NOORI-Activation-Public.zip', 'php/public', ['bootstrap.php', 'index.php', 'admin.php', 'setup.php', '.htaccess']),
+    ('NOORI-Activation-Private.zip', 'php/private', ['config.example.php', 'service.php', 'schema.mysql.sql', '.htaccess']),
+]:
+    with zipfile.ZipFile(output / name, 'w', zipfile.ZIP_DEFLATED) as archive:
+        for filename in allowlist:
+            archive.write(root / folder / filename, filename)
+print('Created separate public/private activation uploads; no homepage, downloads, production config or private signing key included.')

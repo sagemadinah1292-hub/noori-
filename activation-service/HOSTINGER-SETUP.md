@@ -4,6 +4,23 @@ Planned URL: `https://www.noorivst.stopncart.com/noori-activation`.
 This is a deployment guide, not a statement that the site has been deployed or
 that this domain's TLS certificate has been verified.
 
+## Add activation to the already uploaded download website
+
+Use the two separate activation ZIPs to keep the working download page in place:
+
+- Extract **NOORI-Activation-Public.zip** inside the existing public
+  `noori-activation/` directory. It contains PHP endpoint/setup/owner files and
+  the standard routing .htaccess. It does not replace index.html, assets or downloads.
+- Extract **NOORI-Activation-Private.zip** only inside `noori-private/` OUTSIDE
+  every public_html/web-root directory. Do not upload or extract this private ZIP
+  in the public website. It contains template/source files, not a production config
+  or signing key. Continue with private path/config/setup steps below.
+
+Do not re-extract the full source-site ZIP over the working download website:
+its generic welcome page is not the generated page with local installer downloads.
+Back up a custom .htaccess before replacing it. Do not overwrite an existing live
+bootstrap.php configuration or private directory during an upgrade.
+
 ## Files and secrets
 
 1. In Hostinger, enable HTTPS for the domain and select PHP 8.2 or newer with

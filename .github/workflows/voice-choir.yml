@@ -60,6 +60,8 @@ jobs:
           path: |
             dist-activation/NOORI-Activation-Hostinger.zip
             dist-activation/NOORI-Page-Only.zip
+            dist-activation/NOORI-Activation-Public.zip
+            dist-activation/NOORI-Activation-Private.zip
           if-no-files-found: error
   build:
     runs-on: windows-2022
