@@ -81,25 +81,26 @@ jobs:
           if ($LASTEXITCODE -ne 0) {throw 'Windows configuration failed'}
       - name: Compile VST3 and tests
         run: cmake --build build-choir --config Release --parallel 2
-      - name: Start ephemeral activation test service
+      - name: Test DSP, processor, editor and online activation
         shell: pwsh
         run: |
           $fixture=Join-Path (Get-Location) 'build-choir/license-fixture.json'
-          Start-Process node -ArgumentList 'activation-service/scripts/test-server.mjs', $fixture -RedirectStandardOutput 'build-choir/license-server.log' -RedirectStandardError 'build-choir/license-server.err'
-          $deadline=[DateTime]::UtcNow.AddSeconds(20)
-          while (!(Test-Path $fixture)) {
-            if ([DateTime]::UtcNow -gt $deadline) {throw 'Activation test service did not start'}
-            Start-Sleep -Milliseconds 100
-          }
-      - name: Test DSP, processor and editor
-        run: ctest --test-dir build-choir -C Release --output-on-failure
-      - name: Stop activation test service
-        if: always()
-        shell: pwsh
-        run: |
-          if (Test-Path 'build-choir/license-fixture.json') {
-            $fixture=Get-Content 'build-choir/license-fixture.json' -Raw | ConvertFrom-Json
-            Stop-Process -Id $fixture.pid -ErrorAction SilentlyContinue
+          $serverProcess=Start-Process node -ArgumentList 'activation-service/scripts/test-server.mjs', $fixture -RedirectStandardOutput 'build-choir/license-server.log' -RedirectStandardError 'build-choir/license-server.err' -PassThru
+          try {
+            $deadline=[DateTime]::UtcNow.AddSeconds(20)
+            while (!(Test-Path $fixture)) {
+              if ($serverProcess.HasExited) {throw 'Activation fixture process exited early'}
+              if ([DateTime]::UtcNow -gt $deadline) {throw 'Activation test service did not start'}
+              Start-Sleep -Milliseconds 100
+            }
+            $service=Get-Content $fixture -Raw | ConvertFrom-Json
+            Invoke-RestMethod -Uri ($service.baseUrl + '/health') -TimeoutSec 5 | ConvertTo-Json
+            ctest --test-dir build-choir -C Release --output-on-failure
+            if ($LASTEXITCODE -ne 0) {throw 'Windows test suite failed'}
+          } finally {
+            Stop-Process -Id $serverProcess.Id -ErrorAction SilentlyContinue
+            Get-Content 'build-choir/license-server.log' -ErrorAction SilentlyContinue
+            Get-Content 'build-choir/license-server.err' -ErrorAction SilentlyContinue
           }
       - name: Verify and package
         shell: pwsh
@@ -132,5 +133,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Voice-Choir-Test-Logs
-          path: build-choir/Testing/Temporary/
+          path: |
+            build-choir/Testing/Temporary/
+            build-choir/license-server.log
+            build-choir/license-server.err
           if-no-files-found: ignore
