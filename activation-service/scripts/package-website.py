@@ -40,7 +40,7 @@ with zipfile.ZipFile(args.vst3_package) as package:
 
 version=str(info['version']);protected=info.get('licensing_enforced') is True
 if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+',version):raise SystemExit('Unexpected release version.')
-page=(public/'index.html').read_text()
+page=(public/'index.html').read_text(encoding='utf-8')
 def replace_region(text,start,end,replacement):
     pattern=re.escape(start)+r'.*?'+re.escape(end)
     result,count=re.subn(pattern,lambda _:start+replacement+end,text,flags=re.S)
