@@ -16,7 +16,7 @@ inline const char* partName(Part p) {
  return names[int(p)];
 }
 struct ChoirConfig {
- int singers=8, character=0, microphone=0, key=7, scale=0;
+ int singers=8, character=0, microphone=0, key=7, scale=0, customMask=2741;
  bool octaveUp=true, octaveDown=true, thirdAbove=true, thirdBelow=true, fifthAbove=true, fifthBelow=true, stereo=true;
  float variation=6.f;
 };
@@ -37,13 +37,14 @@ inline const std::array<int,7>& scaleNotes(int scale) {
 }
 // Anchor to the nearest scale degree, then preserve the input note's expressive
 // cents offset while moving the requested number of diatonic steps.
-inline double harmonySemitones(double midi, Part part, int key, int scale) {
+inline double harmonySemitones(double midi, Part part, int key, int scale, int customMask=2741) {
  if(part==Part::OctaveUp)return 12; if(part==Part::OctaveDown)return -12;
  int steps=part==Part::ThirdAbove?2:part==Part::ThirdBelow?-2:part==Part::FifthAbove?4:part==Part::FifthBelow?-4:0;
  if(!steps)return 0;
- const auto& notes=scaleNotes(scale); int nearest=0;double distance=1e9;
- auto noteAt=[&](int degree){int octave=int(std::floor(degree/7.));return key+12*octave+notes[degree-7*octave];};
- for(int d=-21;d<=100;++d){double delta=std::abs(noteAt(d)-midi);if(delta<distance){distance=delta;nearest=d;}}
+ std::vector<int> notes;if(scale==4){for(int n=0;n<12;++n)if(customMask&(1<<n))notes.push_back(n);if(notes.empty())throw std::runtime_error("Custom scale needs at least one note.");}else {const auto& selected=scaleNotes(scale);notes.assign(selected.begin(),selected.end());}
+ const int degrees=int(notes.size());int nearest=0;double distance=1e9;
+ auto noteAt=[&](int degree){int octave=int(std::floor(double(degree)/degrees));return key+12*octave+notes[degree-degrees*octave];};
+ for(int d=-3*degrees;d<=15*degrees;++d){double delta=std::abs(noteAt(d)-midi);if(delta<distance){distance=delta;nearest=d;}}
  return noteAt(nearest+steps)-noteAt(nearest);
 }
 struct PitchPoint { float hz=0, confidence=0, rms=0; };
@@ -101,7 +102,7 @@ inline std::vector<float> renderSinger(const float* source,int frames,double rat
   const int position=std::clamp(offset-stretch.inputLatency(),0,frames-1);const auto pitch=melody.at(position);
   double semitones=0;
   if(pitch.hz>0&&pitch.confidence>.75f){const double midi=69+12*std::log2(pitch.hz/440.);
-   semitones=harmonySemitones(midi,part,config.key,config.scale);
+   semitones=harmonySemitones(midi,part,config.key,config.scale,config.customMask);
    if(part!=Part::Main)semitones+=detune*(1+.18*std::sin(position/rate*(2.2+.11*singer)+singer))*.01;
   }
   stretch.setTransposeSemitones(float(semitones));
@@ -120,6 +121,15 @@ inline std::vector<float> renderSinger(const float* source,int frames,double rat
    rendered[frame]=float(std::clamp(x*profile.level*drift,-1.,1.));
   }
   if(progress)progress(float(offset+n)/(frames+latency));
+ }
+ if(part!=Part::Main&&config.variation>0){
+  const auto aligned=rendered;
+  for(int i=first;i<=last;++i){
+   if((i&8191)==0&&cancel)throw std::runtime_error("Cancelled.");
+   const double attack=i>0?std::clamp(std::abs(source[i]-source[i-1])*8.,0.,1.):1.;
+   const double shift=std::sin(i/rate*(1.1+singer*.07)+singer*.91)*rate*.001*std::min(4.f,config.variation*.25f)*(1-attack);
+   const double pos=std::clamp(i+shift,double(first),double(last));const int a=int(pos),b=std::min(a+1,last);rendered[i]=float(aligned[a]+(pos-a)*(aligned[b]-aligned[a]));
+  }
  }
  return rendered;
 }

@@ -15,7 +15,7 @@ Import → Choir Setup → Processing → Results, using the supplied NOORI SVG.
    octaves, thirds and fifths. Main plus selected musical parts occupy the first
    slots; remaining singers are unison variations. Reduce selected parts if they
    exceed the number of singers. Key is manual. Scales: major, natural minor,
-   harmonic minor and ascending melodic minor.
+   harmonic minor, ascending melodic minor, and custom pitch classes selected in Settings.
 3. **CREATE VOCALS** analyzes pitch and renders separate formant-compensated
    musical parts. Progress reflects work. Cancellation keeps the preceding result.
 4. Audition source or generated voices through the plugin's output in the host.
@@ -63,7 +63,7 @@ require listening acceptance. No AI weights or GPU inference are included. See
 Import is limited to mono/stereo, 8–384 kHz, 512 MiB decoded audio. Generation
 rejects configurations exceeding an estimated 512 MiB for source plus dry/wet
 voices. FFT and temporary buffers add overhead. Use shorter files/fewer voices.
-Custom scales and automatic key detection are not implemented in this revision.
+Automatic key detection is not implemented. Custom-scale buttons are intervals relative to the selected key.
 
 ## Project persistence
 

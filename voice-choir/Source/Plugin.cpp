@@ -8,7 +8,7 @@ AudioProcessorValueTreeState::ParameterLayout ChoirProcessor::layout(){
  auto number=[&](const char* id,const char* name,float low,float high,float def){p.add(std::make_unique<AudioParameterFloat>(ParameterID{id,1},name,NormalisableRange<float>(low,high,.01f),def));};
  auto toggle=[&](const char* id,const char* name,bool def){p.add(std::make_unique<AudioParameterBool>(ParameterID{id,1},name,def));};
  integer("voices","Number of singers",2,16,8);integer("character","Voice character DSP",0,7,3);integer("microphone","Microphone character",0,4,0);
- integer("key","Key",0,11,7);integer("scale","Scale",0,3,0);number("detune","Performance variation cents",0,20,6);
+ integer("key","Key",0,11,7);integer("scale","Scale",0,4,0);integer("customMask","Custom scale pitch classes",1,4095,2741);number("detune","Performance variation cents",0,20,6);
  for(auto id:{"octaveUp","octaveDown","thirdAbove","thirdBelow","fifthAbove","fifthBelow"})toggle(id,id,true);
  toggle("stereo","Stereo output",true);number("masterGain","Preview master gain dB",-36,6,-6);
  number("lowCut","Lo Cut Hz",0,500,40);number("brightness","Brightness dB",-12,12,0);number("reverb","Reverb",0,1,.12f);
@@ -19,7 +19,7 @@ ChoirProcessor::ChoirProcessor():AudioProcessor(BusesProperties().withInput("Voc
 ChoirProcessor::~ChoirProcessor(){shuttingDown=true;capturing=false;cancelled=true;{const ScopedLock lock(dataLock);pendingJob={};}if(worker.joinable())worker.join();}
 float ChoirProcessor::value(const char* id)const{auto* v=state.getRawParameterValue(id);return v?v->load():0.f;}
 void ChoirProcessor::setValue(const String& id,float v){if(auto* p=state.getParameter(id)){p->beginChangeGesture();p->setValueNotifyingHost(p->convertTo0to1(v));p->endChangeGesture();}}
-ChoirConfig ChoirProcessor::config()const{ChoirConfig c;c.singers=int(value("voices"));c.character=int(value("character"));c.microphone=int(value("microphone"));c.key=int(value("key"));c.scale=int(value("scale"));c.variation=value("detune");c.octaveUp=value("octaveUp")>.5f;c.octaveDown=value("octaveDown")>.5f;c.thirdAbove=value("thirdAbove")>.5f;c.thirdBelow=value("thirdBelow")>.5f;c.fifthAbove=value("fifthAbove")>.5f;c.fifthBelow=value("fifthBelow")>.5f;c.stereo=value("stereo")>.5f;return c;}
+ChoirConfig ChoirProcessor::config()const{ChoirConfig c;c.singers=int(value("voices"));c.character=int(value("character"));c.microphone=int(value("microphone"));c.key=int(value("key"));c.scale=int(value("scale"));c.customMask=int(value("customMask"));c.variation=value("detune");c.octaveUp=value("octaveUp")>.5f;c.octaveDown=value("octaveDown")>.5f;c.thirdAbove=value("thirdAbove")>.5f;c.thirdBelow=value("thirdBelow")>.5f;c.fifthAbove=value("fifthAbove")>.5f;c.fifthBelow=value("fifthBelow")>.5f;c.stereo=value("stereo")>.5f;return c;}
 FxConfig ChoirProcessor::fxConfig()const{return {value("lowCut"),value("brightness"),value("reverb"),value("printFx")>.5f};}
 void ChoirProcessor::prepareToPlay(double rate,int){capturing=false;captureReady=false;hostRate=rate;setLatencySamples(0);stop();}
 bool ChoirProcessor::isBusesLayoutSupported(const BusesLayout& l)const{auto in=l.getMainInputChannelSet(),out=l.getMainOutputChannelSet();return (in==AudioChannelSet::mono()||in==AudioChannelSet::stereo())&&(out==in||out==AudioChannelSet::stereo());}
@@ -77,7 +77,7 @@ void ChoirProcessor::runJob(std::function<void()> fn,bool replace){
  });}catch(...){const ScopedLock lock(dataLock);busy=false;status="Cannot start audio worker.";}
 }
 void ChoirProcessor::publish(std::shared_ptr<ChoirSession> s,bool resetMix){
- stop();if(resetMix)for(int i=0;i<16;++i){auto m=StemMix{};if(s->config.stereo&&s->stems.size()>1)m.pan=float(-.75+1.5*i/std::max(1,int(s->stems.size())-1));setStemMix(i,m);}
+ stop();if(resetMix)sourceMuted=false;if(resetMix)for(int i=0;i<16;++i){auto m=StemMix{};if(s->config.stereo&&s->stems.size()>1)m.pan=float(-.75+1.5*i/std::max(1,int(s->stems.size())-1));setStemMix(i,m);}
  {const ScopedLock lock(dataLock);current=s;exports.clear();dropFiles.clear();dragDirty=true;}
  {const ScopedLock lock(previewLock);preview=std::move(s);}
  ++dataRevision;

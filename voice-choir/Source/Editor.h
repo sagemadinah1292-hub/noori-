@@ -18,7 +18,7 @@ private:
  sourcePlay{"PLAY"},sourceMute{"M"},removeSource{"X"},create{"CREATE VOCALS"},cancel{"CANCEL"},
  playAll{"PLAY ALL"},stopAll{"STOP"},exportAll{"EXPORT STEMS"},exportMix{"EXPORT MIX"},openFolder{"OPEN FOLDER"};
  juce::ComboBox character,microphone,singers,key,scale,output,theme,scaling;
- std::array<juce::TextButton,6> parts;
+ std::array<juce::TextButton,6> parts;std::array<juce::TextButton,12> customNotes;
  juce::ToggleButton printFx{"PRINT POST FX TO STEMS"},floatWav{"32-bit float WAV (off = 24-bit PCM)"},bwf{"Include source BWF timestamp"};
  juce::Slider masterGain,lowCut,brightness,reverb,variation;
  juce::Label status,sourceName,progressLabel;

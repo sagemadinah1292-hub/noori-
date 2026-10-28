@@ -65,8 +65,11 @@ ChoirEditor::ChoirEditor(ChoirProcessor& processor):AudioProcessorEditor(process
  hookCombo(character,"character",{"Gospel","Kids","Shout","Naat Choir","Soft Emotional","Male Ensemble","Female Ensemble","Mixed Ensemble"});
  hookCombo(microphone,"microphone",{"Clean","Warm Vintage","Modern Studio","Warm Ribbon","Bright Condenser"});
  add(singers,"singers");for(int n:{2,4,6,8,12,16})singers.addItem(String(n)+" singers",n);singers.setSelectedId(int(p.value("voices")),dontSendNotification);singers.onChange=[this]{p.setValue("voices",float(singers.getSelectedId()));};
- hookCombo(key,"key",{"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"});hookCombo(scale,"scale",{"Major","Natural Minor","Harmonic Minor","Melodic Minor"});
+ hookCombo(key,"key",{"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"});hookCombo(scale,"scale",{"Major","Natural Minor","Harmonic Minor","Melodic Minor","Custom"});
  hookCombo(output,"stereo",{"Mono","Stereo"});
+ const char* intervals[]{"1","b2","2","b3","3","4","#4","5","b6","6","b7","7"};
+ for(int i=0;i<12;++i){auto& note=customNotes[i];add(note,("customNote"+String(i)).toRawUTF8());note.setButtonText(intervals[i]);note.setClickingTogglesState(true);note.setToggleState((int(p.value("customMask"))&(1<<i))!=0,dontSendNotification);note.onClick=[this,i]{int mask=0;for(int n=0;n<12;++n)if(customNotes[n].getToggleState())mask|=1<<n;if(mask==0){customNotes[i].setToggleState(true,dontSendNotification);return;}p.setValue("customMask",float(mask));p.setValue("scale",4);};}
+
  const char* partIds[]{"octaveUp","octaveDown","thirdAbove","thirdBelow","fifthAbove","fifthBelow"};const char* partText[]{"OCTAVE UP","OCTAVE DOWN","THIRD ABOVE","THIRD BELOW","FIFTH ABOVE","FIFTH BELOW"};
  for(int i=0;i<6;++i){add(parts[i],partIds[i]);parts[i].setButtonText(partText[i]);parts[i].setClickingTogglesState(true);buttonAttachments.push_back(std::make_unique<AudioProcessorValueTreeState::ButtonAttachment>(p.state,partIds[i],parts[i]));}
  hookSlider(masterGain,"masterGain",-36,6," dB");hookSlider(lowCut,"lowCut",0,500," Hz");hookSlider(brightness,"brightness",-12,12," dB");hookSlider(reverb,"reverb",0,1,"");hookSlider(variation,"detune",0,20," cents");
@@ -104,6 +107,7 @@ void ChoirEditor::resized(){
  lowCut.setBounds(258,752,120,125);brightness.setBounds(408,752,120,125);reverb.setBounds(558,752,120,125);printFx.setBounds(22,850,245,36);
  exportAll.setBounds(22,913,160,38);exportMix.setBounds(190,913,140,38);openFolder.setBounds(22,953,160,30);stemsButton->setBounds(352,916,342,66);
  theme.setBounds(300,254,370,44);scaling.setBounds(300,326,370,44);floatWav.setBounds(48,416,624,40);bwf.setBounds(48,478,624,40);variation.setBounds(300,545,140,130);
+ for(int i=0;i<12;++i)customNotes[i].setBounds(48+(i%6)*104,714+(i/6)*42,96,34);
  status.setBounds(24,page==Page::Results?886:912,672,page==Page::Results?25:65);status.setFont(FontOptions(12.f));
 }
 void ChoirEditor::showPage(Page next){page=next;updateVisibility();resized();canvas->repaint();}
@@ -113,7 +117,7 @@ void ChoirEditor::updateVisibility(){for(int i=0;i<canvas->getNumChildComponents
  if(page==Page::Setup){show({&browse,&capture,&sourcePlay,&sourceMute,&removeSource,sourceWave.get(),&sourceName,&character,&microphone,&singers,&key,&scale,&output,&create});for(auto& b:parts)b.setVisible(true);}
  if(page==Page::Processing)show({&cancel,&progressLabel});
  if(page==Page::Results)show({&playAll,&stopAll,&masterGain,&viewport,&lowCut,&brightness,&reverb,&printFx,&exportAll,&exportMix,&openFolder,stemsButton.get()});
- if(page==Page::Settings)show({&theme,&scaling,&floatWav,&bwf,&variation});
+ if(page==Page::Settings){show({&theme,&scaling,&floatWav,&bwf,&variation});for(auto& note:customNotes)note.setVisible(true);}
 }
 void ChoirEditor::rebuildLanes(){rows.clear();auto s=p.session();if(s){sourceWave->setAudio(s->source);if(s->source)sourceName.setText(s->source->name+"  |  "+String(s->source->rate,0)+" Hz  |  "+String(s->source->audio.getNumSamples()/s->source->rate,2)+" s",dontSendNotification);for(int i=0;i<int(s->stems.size());++i){auto row=std::make_unique<SingerRow>(p,i,s->stems[i]);row->onExport=[this](int index){chooseExport(index);};lanes.addAndMakeVisible(*row);rows.push_back(std::move(row));}}else sourceWave->setAudio({});lastRevision=p.revision();resized();}
 void ChoirEditor::timerCallback(){
@@ -121,7 +125,9 @@ void ChoirEditor::timerCallback(){
  if(p.revision()!=lastRevision){rebuildLanes();if(auto s=p.session())renderedFx=s->fx;if(page!=Page::Settings)showPage(p.stemCount()>0?Page::Results:p.hasSource()?Page::Setup:Page::Import);}
  if(page==Page::Processing&&!p.isBusy())showPage(p.stemCount()>0?Page::Results:p.hasSource()?Page::Setup:Page::Import);
  if(dark!=p.darkMode.load()||scaleFactor!=p.uiScale.load()){theme.setSelectedId(p.darkMode?1:2,dontSendNotification);scaling.setSelectedId(p.uiScale,dontSendNotification);applyAppearance();}
+ for(int n=0;n<12;++n)customNotes[n].setToggleState((int(p.value("customMask"))&(1<<n))!=0,dontSendNotification);
  status.setText(p.jobStatus()+(p.isBusy()?"  "+String(int(p.jobProgress()*100))+"%":""),dontSendNotification);progressLabel.setText(String(int(p.jobProgress()*100))+"%",dontSendNotification);
+ sourceMute.setToggleState(p.sourceMuted,dontSendNotification);
  capture.setButtonText(p.isCapturing()?"STOP CAPTURE  "+String(p.capturedSeconds(),1)+" s":"CAPTURE FROM TRACK");
  for(auto* c:std::initializer_list<Component*>{&browse,&capture,&create,&removeSource,&exportAll,&exportMix,&character,&microphone,&singers,&key,&scale,&output})c->setEnabled(!p.isBusy());
  for(auto* control:std::initializer_list<Component*>{&lowCut,&brightness,&reverb,&printFx,&floatWav,&bwf})control->setEnabled(!p.isBusy());
@@ -154,5 +160,5 @@ void ChoirEditor::paintPage(Graphics& g){
  if(page==Page::Setup){separator(318);title("CHOIR MODEL",24,337,208,48);title("DSP character presets",24,375,208,20,12);title("MICROPHONE",24,394,208,44);title("NUMBER OF SINGERS",24,449,208,44);separator(498);title("ADD OCTAVES",24,510,208,44);title("KEY / SCALE",24,570,208,44);title("ADD HARMONIES",24,626,208,44);separator(748);title("GENERATE CHOIR",24,782,208,60,19);title("Main + selected parts; remaining singers become unison voices.",25,864,670,30,14);}
  if(page==Page::Processing){bevel(g,Rectangle<float>(56,328,608,420),top.brighter(.07f),bottom,14);title("Your Choir Is Singing",146,378,470,66,30);auto track=Rectangle<float>(112,518,496,16);g.setColour(Colours::black.withAlpha(.25f));g.fillRoundedRectangle(track,8);track.setWidth(track.getWidth()*p.jobProgress());g.setColour(Colour(0xff51dbc0));g.fillRoundedRectangle(track,8);}
  if(page==Page::Results){title("MASTER GAIN",314,240,150,25,13);title(String(rows.size())+" individual vocal parts",462,160,230,54,19);separator(260);separator(728);title("POST FX",24,750,215,34,24);title("Audition the effects here.\nChoose whether to print them\nto individual exported stems.",24,790,220,58,14);title("LO-CUT",264,733,116,24,13);title("BRIGHTNESS",408,733,120,24,13);title("REVERB",562,733,112,24,13);separator(907);}
- if(page==Page::Settings){title("SETTINGS",40,160,640,58,30);title("APPEARANCE",48,254,240,44);title("INTERFACE SCALE",48,326,240,44);title("PERFORMANCE VARIATION",48,565,235,70);title("Engine: formant-aware DSP. Neural singer models are not installed.\nFile drag into Cubase requires host acceptance testing.\nProject audio is restored from the persistent local cache.\nTiming follows your source performance; no tempo stretching.",48,728,624,146,16);}
+ if(page==Page::Settings){title("SETTINGS",40,160,640,58,30);title("APPEARANCE",48,254,240,44);title("INTERFACE SCALE",48,326,240,44);title("PERFORMANCE VARIATION",48,565,235,70);title("CUSTOM SCALE - intervals relative to the selected key",48,674,624,32,15);title("Engine: formant-aware DSP; neural singer models are not installed.\nTiming follows the source. Cubase acceptance remains pending.",48,812,624,82,14);}
 }

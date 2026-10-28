@@ -1,0 +1,3 @@
+# Preserve the user's original Illustrator SVG and upstream vendored whitespace.
+voice-choir/Assets/NOORI-original.svg -text -whitespace
+voice-choir/ThirdParty/** -whitespace
