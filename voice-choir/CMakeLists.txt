@@ -39,4 +39,3 @@ if(CHOIR_BUILD_PLUGIN)
  add_test(NAME ChoirProcessorAndEditor COMMAND choir_plugin_tests "${CMAKE_BINARY_DIR}")
  set_tests_properties(ChoirProcessorAndEditor PROPERTIES TIMEOUT 120)
 endif()
-

@@ -31,4 +31,3 @@ private:
  noori_choir::Engine engine;std::atomic<bool> clearRequested{false};std::array<std::atomic<float>*,6> values{};
  static juce::AudioProcessorValueTreeState::ParameterLayout layout();
 };
-

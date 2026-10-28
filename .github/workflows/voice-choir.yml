@@ -1,7 +1,7 @@
 name: NOORI CHOIR Windows x64
 on:
   push:
-    branches: ['codex/choir-offline']
+    branches: ['main']
     paths: ['voice-choir/**', '.github/workflows/voice-choir.yml']
   pull_request:
     paths: ['voice-choir/**', '.github/workflows/voice-choir.yml']
@@ -45,4 +45,3 @@ jobs:
           name: Voice-Choir-Test-Logs
           path: build-choir/Testing/Temporary/
           if-no-files-found: ignore
-

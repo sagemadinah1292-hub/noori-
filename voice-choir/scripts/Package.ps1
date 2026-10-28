@@ -22,4 +22,3 @@ $source=Join-Path $package 'Source';New-Item -ItemType Directory -Path $source -
 Copy-Item -Recurse 'voice-choir' $source
 Copy-Item -Recurse '.github' $source
 Compress-Archive -Path $package -DestinationPath (Join-Path $OutputDir 'Noori-Choir-0.2.0-Windows-x64.zip') -Force
-

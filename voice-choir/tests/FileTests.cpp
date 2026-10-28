@@ -29,6 +29,17 @@ int main(int argc,char** argv){try{
   check(rejected&&dest.getNumberOfChildFiles(juce::File::findFiles)==before,"Cancellation publishes no partial files");
   check(dest.getNumberOfChildFiles(juce::File::findDirectories)==0,"Staging cleaned after cancellation");
  }
+ // Hand-written IEEE-float WAV fixture exercises the decoder independently of JUCE's writer.
+ const auto floatFile=project.getChildFile("float.wav");
+ {auto stream=floatFile.createOutputStream();check(bool(stream),"Float fixture stream");
+  stream->write("RIFF",4);stream->writeInt(36+16);stream->write("WAVEfmt ",8);stream->writeInt(16);stream->writeShort(3);stream->writeShort(1);stream->writeInt(48000);stream->writeInt(48000*4);stream->writeShort(4);stream->writeShort(32);stream->write("data",4);stream->writeInt(16);
+  for(float value:{0.f,.25f,-.5f,0.f})stream->writeFloat(value);
+ }
+ const auto floatVocal=noori_choir::readWav(floatFile,cancel);check(floatVocal.audio.getNumSamples()==4&&floatVocal.audio.getSample(0,2)==-.5f,"IEEE float WAV decoding");
+ const auto bad=project.getChildFile("bad.wav");bad.replaceWithText("Not WAV audio");bool malformed=false;try{noori_choir::readWav(bad,cancel);}catch(...){malformed=true;}check(malformed,"Malformed WAV rejected");
+ bool invalidDirectory=false;try{noori_choir::exportWavs(floatVocal,project.getChildFile("does-not-exist"),8,12,cancel,progress);}catch(...){invalidDirectory=true;}check(invalidDirectory,"Invalid project directory rejected");
+ auto first=noori_choir::exportWavs(floatVocal,project,8,12,cancel,progress);auto second=noori_choir::exportWavs(floatVocal,project,8,12,cancel,progress);
+ check(first.size()==8&&second.size()==8,"Repeated export complete");for(const auto& file:first)check(juce::File(file).existsAsFile()&&!second.contains(file),"Previous export never overwritten");
  check(out.getChildFile("choir-files.ok").replaceWithText("PASS background import, eight WAV stems, rate/channels/frame count, independent audio, cancellation and failure recovery.\n"),"File test marker");
  std::cout<<"PASS WAV integration tests\n";return 0;
 }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}

@@ -21,4 +21,3 @@ int main(int argc,char**argv){try{juce::ScopedJuceInitialiser_GUI init;ChoirProc
  }
  p.darkMode=false;p.uiScale=3;juce::MemoryBlock uiState;p.getStateInformation(uiState);restored.setStateInformation(uiState.getData(),int(uiState.getSize()));check(!restored.darkMode&&restored.uiScale==3,"Appearance saved in host state");
  out.getChildFile("choir-tests.ok").replaceWithText("Engine and processor/editor tests passed. Cubase acceptance listening not yet performed.\n");std::cout<<"PASS processor, state, mono/stereo routing, UI preset and preview\n";return 0;}catch(const std::exception&e){std::cerr<<e.what()<<'\n';return 1;}}
-
