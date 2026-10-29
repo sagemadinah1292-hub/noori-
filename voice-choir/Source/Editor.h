@@ -6,7 +6,7 @@ public:
  explicit ChoirEditor(ChoirProcessor&);~ChoirEditor()override;
  void resized()override;void paint(juce::Graphics&)override;
  bool isInterestedInFileDrag(const juce::StringArray&)override;void filesDropped(const juce::StringArray&,int,int)override;
- void showPage(Page);Page visiblePage()const{return page;}bool hasBrandLogo()const{return brandLogo!=nullptr;}juce::String accessLabel()const{return licenseBadge.getText();}
+ void showPage(Page);Page visiblePage()const{return page;}bool hasBrandLogo()const{return brandLogo!=nullptr;}juce::String accessLabel()const{return licenseBadge.getText();}juce::String versionText()const{return versionBadge.getText();}
 private:
  class GoldLook;class Canvas;class WaveDisplay;class SingerRow;class StemDragButton;
  ChoirProcessor& p;std::unique_ptr<GoldLook> look;std::unique_ptr<Canvas> canvas;
@@ -24,13 +24,14 @@ private:
  juce::ToggleButton autoKey{"AUTO DETECT KEY / SCALE"};
  juce::ToggleButton printFx{"PRINT POST FX TO STEMS"},floatWav{"32-bit float WAV (off = 24-bit PCM)"},bwf{"Include source BWF timestamp"};
  juce::Slider masterGain,lowCut,brightness,reverb,variation;
- juce::Label status,sourceName,progressLabel,licenseBadge;
+ juce::Label status,sourceName,progressLabel,licenseBadge,versionBadge;
  juce::Viewport viewport;juce::Component lanes;std::vector<std::unique_ptr<SingerRow>> rows;
  std::vector<std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>> sliderAttachments;
  std::vector<std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment>> comboAttachments;
  std::vector<std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment>> buttonAttachments;
  Page page=Page::Import,returnPage=Page::Import;int lastRevision=-1,lastScaleCode=-1;float scaleFactor=.75f;bool dark=true;double fxChangedAt=0;
  noori_choir::FxConfig renderedFx;
+ unsigned long long lastAudioBlocks=0;double lastAudioTick=0;bool previewWasPlaying=false;
  void timerCallback()override;void paintPage(juce::Graphics&);void updateVisibility();void applyAppearance();void rebuildLanes();
  void chooseInput();void chooseExport(int);void hookSlider(juce::Slider&,const char*,double,double,const juce::String&);
  void hookCombo(juce::ComboBox&,const char*,juce::StringArray);void beginJob(Page);

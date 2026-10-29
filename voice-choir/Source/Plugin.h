@@ -33,6 +33,8 @@ public:
  void startCapture();void stopCapture();bool isCapturing()const{return capturing.load();}
  bool capturePending()const{return captureReady.load();}double capturedSeconds()const{return capturedFrames.load()/hostRate.load();}
  int revision()const{return dataRevision.load();}
+ unsigned long long audioBlocks()const{return audioBlockCount.load(std::memory_order_relaxed);}
+ float previewLevelDb()const{return juce::Decibels::gainToDecibels(previewPeak.load(),-100.f);}
  std::atomic<bool> sourceMuted{false};
  std::atomic<bool> darkMode{true};std::atomic<int> uiScale{0};
 private:
@@ -47,6 +49,7 @@ private:
  juce::Reverb previewReverb;juce::SmoothedValue<float> cutSmooth,brightSmooth,wetSmooth;
  std::array<double,2> fxX{},fxY{},fxLow{};
  void processPreviewFx(juce::AudioBuffer<float>&);
+ std::atomic<unsigned long long> audioBlockCount{0};std::atomic<float> previewPeak{0};
  std::atomic<int> playbackMode{-3};std::atomic<bool> rewind{false};double cursor=0;
  std::atomic<double> previewFrame{0},hostRate{48000};
  struct AtomicMix {std::atomic<float> gain{0},pan{0};std::atomic<bool> mute{false},solo{false};};

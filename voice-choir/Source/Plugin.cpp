@@ -24,7 +24,7 @@ FxConfig ChoirProcessor::fxConfig()const{return {value("lowCut"),value("brightne
 void ChoirProcessor::prepareToPlay(double rate,int){capturing=false;captureReady=false;hostRate=rate;setLatencySamples(0);stop();previewReverb.setSampleRate(rate);previewReverb.reset();fxX.fill(0);fxY.fill(0);fxLow.fill(0);cutSmooth.reset(rate,.025);brightSmooth.reset(rate,.025);wetSmooth.reset(rate,.025);cutSmooth.setCurrentAndTargetValue(value("lowCut"));brightSmooth.setCurrentAndTargetValue(value("brightness"));wetSmooth.setCurrentAndTargetValue(value("reverb"));}
 bool ChoirProcessor::isBusesLayoutSupported(const BusesLayout& l)const{auto in=l.getMainInputChannelSet(),out=l.getMainOutputChannelSet();return (in==AudioChannelSet::mono()||in==AudioChannelSet::stereo())&&(out==in||out==AudioChannelSet::stereo());}
 void ChoirProcessor::processBlock(AudioBuffer<float>& buffer,MidiBuffer&){
- ScopedNoDenormals guard;const int frames=buffer.getNumSamples();
+ ScopedNoDenormals guard;const int frames=buffer.getNumSamples();if(frames<=0||buffer.getNumChannels()==0)return;audioBlockCount.fetch_add(1,std::memory_order_relaxed);
  if(!licensing.canUse()){capturing=false;playbackMode=-3;if(getTotalNumInputChannels()==1&&buffer.getNumChannels()>1)buffer.copyFrom(1,0,buffer,0,0,frames);return;}
  if(capturing.load()){
   const ScopedTryLock lock(captureLock);
@@ -55,7 +55,7 @@ void ChoirProcessor::processBlock(AudioBuffer<float>& buffer,MidiBuffer&){
   }
  }
  if(!sourceMode)processPreviewFx(buffer);
- previewFrame=cursor;if(cursor>=length)playbackMode=-3;
+ previewPeak=buffer.getMagnitude(0,frames);previewFrame=cursor;if(cursor>=length)playbackMode=-3;
 }
 void ChoirProcessor::processPreviewFx(AudioBuffer<float>& buffer){
  cutSmooth.setTargetValue(value("lowCut"));brightSmooth.setTargetValue(value("brightness"));wetSmooth.setTargetValue(value("reverb"));
@@ -70,8 +70,16 @@ void ChoirProcessor::processPreviewFx(AudioBuffer<float>& buffer){
   if(buffer.getNumChannels()==1)previewReverb.processMono(buffer.getWritePointer(0,offset),count);else previewReverb.processStereo(buffer.getWritePointer(0,offset),buffer.getWritePointer(1,offset),count);
  }
 }
-void ChoirProcessor::play(int voice){if(!requireLicense())return;if(isCapturing())return;const auto s=session();if(!s||!s->source||voice>=int(s->stems.size())||(voice==-1&&s->stems.empty()))return;rewind=true;playbackMode=voice;}
-void ChoirProcessor::stop(){playbackMode=-3;rewind=true;previewFrame=0;}
+void ChoirProcessor::play(int voice){
+ if(!requireLicense())return;const auto s=session();String error;
+ if(isCapturing())error="Stop capture before starting preview.";
+ else if(!s||!s->source)error="Import a vocal before starting preview.";
+ else if(voice==-1&&s->stems.empty())error="Create vocals before using Play All.";
+ else if(voice< -2||voice>=int(s->stems.size()))error="That preview voice is unavailable.";
+ if(error.isNotEmpty()){const ScopedLock lock(dataLock);status=error;return;}
+ rewind=true;playbackMode=voice;const ScopedLock lock(dataLock);status="Preview playing through the Cubase track output.";
+}
+void ChoirProcessor::stop(){previewPeak=0;playbackMode=-3;rewind=true;previewFrame=0;}
 std::shared_ptr<const ChoirSession> ChoirProcessor::session()const{const ScopedLock lock(dataLock);return current;}
 bool ChoirProcessor::hasSource()const{auto s=session();return s&&s->source;}
 int ChoirProcessor::stemCount()const{auto s=session();return s?int(s->stems.size()):0;}

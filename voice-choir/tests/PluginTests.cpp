@@ -1,12 +1,13 @@
 #include "Plugin.h"
 #include "Editor.h"
+#include "NooriLicenseConfig.h"
 #include <iostream>
 void check(bool b,const char* message){if(!b)throw std::runtime_error(message);}
 void wait(ChoirProcessor& p){double end=juce::Time::getMillisecondCounterHiRes()+240000;while(p.isBusy()){check(juce::Time::getMillisecondCounterHiRes()<end,"Worker timeout");juce::Thread::sleep(2);}}
 juce::Component* find(juce::Component& root,const juce::String& id){if(root.getComponentID()==id)return &root;for(int i=0;i<root.getNumChildComponents();++i)if(auto* result=find(*root.getChildComponent(i),id))return result;return nullptr;}
 int main(int argc,char** argv){try{using namespace juce;using namespace noori_choir;ScopedJuceInitialiser_GUI init;auto out=argc>1?File(argv[1]):File::getCurrentWorkingDirectory();out.createDirectory();
  ChoirProcessor p(noori_licensing::Config{});p.setRateAndBufferSizeDetails(48000,256);p.prepareToPlay(48000,256);check(p.value("autoKey")>.5f,"New instances default to auto key detection");check(p.getLatencySamples()==0,"Offline workflow uses transparent zero-latency insert");
- std::unique_ptr<ChoirEditor> editor(static_cast<ChoirEditor*>(p.createEditor()));check(editor->hasBrandLogo(),"Supplied SVG decoded");check(editor->getWidth()==540&&editor->getHeight()==750,"New instances fit at 75 percent");
+ std::unique_ptr<ChoirEditor> editor(static_cast<ChoirEditor*>(p.createEditor()));check(editor->versionText()=="v"+String(NOORI_PLUGIN_VERSION),"Visible version matches the installed build");check(editor->hasBrandLogo(),"Supplied SVG decoded");check(editor->getWidth()==540&&editor->getHeight()==750,"New instances fit at 75 percent");
  auto capture=[&](const String& file){Image image(Image::ARGB,editor->getWidth(),editor->getHeight(),true,SoftwareImageType{});Graphics g(image);editor->paintEntireComponent(g,true);PNGImageFormat png;auto stream=out.getChildFile(file).createOutputStream();check(stream&&png.writeImageToStream(image,*stream),"Actual editor screenshot");
   const float factor=editor->getWidth()/720.f;int white=0;
   for(int y=roundToInt(20*factor);y<roundToInt(92*factor);++y)for(int x=roundToInt(139*factor);x<roundToInt(261*factor);++x){auto pixel=image.getPixelAt(x,y);if(pixel.getRed()>240&&pixel.getGreen()>240&&pixel.getBlue()>240)++white;}
