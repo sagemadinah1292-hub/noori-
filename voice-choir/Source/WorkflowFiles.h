@@ -31,8 +31,11 @@ inline void writeWave(const juce::File& target,const VocalFile& source,int bits,
  stream->write("RIFF",4);stream->writeInt(int(36+bextSize+dataSize+(dataSize&1)));stream->write("WAVE",4);
  if(bwf){stream->write("bext",4);stream->writeInt(602);std::array<char,602> chunk{};const std::string description="NOORI CHOIR synchronized vocal stem";std::copy(description.begin(),description.end(),chunk.begin());auto reference=std::uint64_t(std::max(juce::int64(0),source.sampleOffset));for(int i=0;i<8;++i)chunk[338+i]=char(reference>>(8*i));chunk[346]=1;stream->write(chunk.data(),chunk.size());}
  stream->write("fmt ",4);stream->writeInt(16);stream->writeShort(bits==32?3:1);stream->writeShort(short(channels));stream->writeInt(int(source.rate));stream->writeInt(int(source.rate)*channels*bytes);stream->writeShort(short(channels*bytes));stream->writeShort(short(bits));stream->write("data",4);stream->writeInt(int(dataSize));
- const float gain=mix.mute?0.f:std::pow(10.f,mix.gain/20.f);
- std::array<float,2> balance{std::sqrt(std::max(0.f,1-mix.pan)),std::sqrt(std::max(0.f,1+mix.pan))};
+ float gain=mix.mute?0.f:std::pow(10.f,mix.gain/20.f);
+ std::array<float,2> balance{std::sqrt(std::clamp(1-mix.pan,0.f,1.f)),std::sqrt(std::clamp(1+mix.pan,0.f,1.f))};
+ // Preserve waveform shape rather than hard-clipping an over-level PCM file.
+ // Float exports retain their available headroom for downstream mixing.
+ if(bits!=32&&gain>0){float peak=0;for(int ch=0;ch<source.audio.getNumChannels();++ch){const auto range=source.audio.findMinMax(ch,0,frames);peak=std::max(peak,std::max(std::abs(range.getStart()),std::abs(range.getEnd())));}if(peak*gain>.98f)gain*=.98f/(peak*gain);}
  juce::MemoryOutputStream block;
  for(int offset=0;offset<frames;offset+=4096){if(cancelled)throw std::runtime_error("Cancelled.");block.reset();const int n=std::min(4096,frames-offset);
   for(int i=0;i<n;++i)for(int ch=0;ch<channels;++ch){float x=source.audio.getSample(std::min(ch,source.audio.getNumChannels()-1),offset+i);if(forceMono&&source.audio.getNumChannels()==2)x=.5f*(source.audio.getSample(0,offset+i)+source.audio.getSample(1,offset+i));x*=gain*(channels==2?balance[ch]:1.f);if(!std::isfinite(x))throw std::runtime_error("Non-finite export audio.");
@@ -56,7 +59,7 @@ inline juce::StringArray exportSession(const ChoirSession& session,const juce::F
    VocalFile combined;combined.rate=session.source->rate;combined.sampleOffset=session.source->sampleOffset;combined.audio.setSize(session.config.stereo?2:1,session.source->audio.getNumSamples());combined.audio.clear();
    bool anySolo=std::any_of(mix.begin(),mix.end(),[](auto m){return m.solo;});
    for(int v=0;v<int(session.stems.size());++v){auto m=mix[v];if(m.mute||(anySolo&&!m.solo))continue;const auto& data=printFx?*session.stems[v].wet:*session.stems[v].dry;const float gain=std::pow(10.f,m.gain/20.f)/float(session.stems.size());
-    for(int ch=0;ch<combined.audio.getNumChannels();++ch){float pan=combined.audio.getNumChannels()==1?1.f:std::sqrt(std::max(0.f,ch==0?1-m.pan:1+m.pan));combined.audio.addFrom(ch,0,data.audio,std::min(ch,data.audio.getNumChannels()-1),0,combined.audio.getNumSamples(),gain*pan);}
+    for(int ch=0;ch<combined.audio.getNumChannels();++ch){float pan=combined.audio.getNumChannels()==1?1.f:std::sqrt(std::clamp(ch==0?1-m.pan:1+m.pan,0.f,1.f));combined.audio.addFrom(ch,0,data.audio,std::min(ch,data.audio.getNumChannels()-1),0,combined.audio.getNumSamples(),gain*pan);}
    }
    writeWave(staging.getChildFile("NOORI_CHOIR_Mix_"+id+".wav"),combined,bits,bwf,cancelled);
   }else for(int index=0;index<count;++index){const int v=selected>=0?selected:index;const auto& stem=session.stems[v];const auto name="NOORI_CHOIR_"+juce::String(v+1).paddedLeft('0',2)+"_"+juce::File::createLegalFileName(stem.name).replaceCharacter(' ','_')+"_"+id+".wav";

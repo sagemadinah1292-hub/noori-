@@ -43,7 +43,7 @@ void ChoirProcessor::processBlock(AudioBuffer<float>& buffer,MidiBuffer&){
  const bool sourceMode=mode==-2;bool anySolo=false;for(int v=0;v<int(preview->stems.size());++v)anySolo=anySolo||mixes[v].solo.load();
  const float masterGain=std::pow(10.f,master->load()/20.f);const float normalise=sourceMode||mode>=0?1.f:1.f/float(std::max(1,int(preview->stems.size())));
  std::array<float,16> gainCache{},leftCache{},rightCache{};
- for(int v=0;v<int(preview->stems.size());++v){gainCache[v]=std::pow(10.f,mixes[v].gain.load()/20.f);const float pan=mixes[v].pan.load();leftCache[v]=std::sqrt(std::max(0.f,1-pan));rightCache[v]=std::sqrt(std::max(0.f,1+pan));}
+ for(int v=0;v<int(preview->stems.size());++v){gainCache[v]=std::pow(10.f,mixes[v].gain.load()/20.f);const float pan=mixes[v].pan.load();leftCache[v]=std::sqrt(std::clamp(1-pan,0.f,1.f));rightCache[v]=std::sqrt(std::clamp(1+pan,0.f,1.f));}
  for(int i=0;i<frames&&cursor<length;++i,cursor+=increment){const int a=int(cursor),b=std::min(a+1,length-1);const float frac=float(cursor-a);
   const int count=sourceMode?1:int(preview->stems.size());for(int v=0;v<count;++v){if(!sourceMode&&((mode>=0&&mode!=v)||mixes[v].mute.load()||(mode==-1&&anySolo&&!mixes[v].solo.load())))continue;
    const auto& audio=sourceMode?preview->source->audio:preview->stems[v].dry->audio;
