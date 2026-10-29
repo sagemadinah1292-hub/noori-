@@ -123,7 +123,7 @@ inline std::vector<float> renderSinger(const float* source,int frames,double rat
  const int latency=stretch.inputLatency()+stretch.outputLatency(),block=256;
  const auto profile=characterProfile(config.character);
  std::vector<float> rendered(frames),in(block),out(block);
- int first=0,last=frames-1;while(first<frames&&std::abs(source[first])<1e-9f)++first;while(last>=first&&std::abs(source[last])<1e-9f)--last;
+ int first=0,last=frames-1;while(first<frames&&std::abs(source[first])<1e-9f)++first;while(last>=first&&std::abs(source[last])<1e-9f)--last;if(first>=frames)return rendered;
  const float* inputs[]{in.data()};float* outputs[]{out.data()};
  const double detune=(singer%2?1.:-1.)*(.3+.7*(singer%8)/7.)*config.variation;
  const double micTilt=std::array<float,5>{0,-2,1.5f,-1,3}[std::clamp(config.microphone,0,4)];

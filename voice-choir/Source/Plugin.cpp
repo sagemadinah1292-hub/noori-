@@ -1,7 +1,23 @@
 #include "Plugin.h"
 #include "Editor.h"
+#include "RenderMemory.h"
+#if JUCE_WINDOWS
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
 using namespace juce;
 using namespace noori_choir;
+namespace {
+std::uint64_t currentRenderBudget(std::uint64_t resident){
+#if JUCE_WINDOWS
+ MEMORYSTATUSEX info{};info.dwLength=sizeof(info);if(GlobalMemoryStatusEx(&info))return renderBudgetForAvailable(info.ullAvailPhys,resident);
+#endif
+ return renderBudgetForAvailable(std::uint64_t(SystemStats::getMemorySizeInMegabytes())*renderMiB/2,resident);
+}
+std::uint64_t retainedStemBytes(const ChoirSession& s){std::uint64_t bytes=0;for(const auto& stem:s.stems)for(const auto* file:{stem.dry.get(),stem.wet.get()})if(file)bytes+=std::uint64_t(file->audio.getNumSamples())*file->audio.getNumChannels()*sizeof(float);return bytes;}
+}
 AudioProcessorValueTreeState::ParameterLayout ChoirProcessor::layout(){
  AudioProcessorValueTreeState::ParameterLayout p;
  auto integer=[&](const char* id,const char* name,int low,int high,int def){p.add(std::make_unique<AudioParameterInt>(ParameterID{id,1},name,low,high,def));};
@@ -95,7 +111,7 @@ void ChoirProcessor::runJob(std::function<void()> fn,bool replace){
  if(worker.joinable())worker.join();
  try{worker=std::thread([this,task=std::move(fn)]()mutable{
   for(;;){
-   try{task();}catch(const std::exception& e){const ScopedLock lock(dataLock);status=String::fromUTF8(e.what());}catch(...){const ScopedLock lock(dataLock);status="Audio operation failed.";}
+   try{task();}catch(const std::bad_alloc&){const ScopedLock lock(dataLock);status="Not enough available RAM to finish. Reduce singers, select Mono, or free RAM and retry.";}catch(const std::exception& e){const ScopedLock lock(dataLock);status=String::fromUTF8(e.what());}catch(...){const ScopedLock lock(dataLock);status="Audio operation failed.";}
    const ScopedLock lock(dataLock);
    if(pendingJob&&!shuttingDown){task=std::move(pendingJob);pendingJob={};cancelled=false;progress=0;status="Restoring saved project audio...";}
    else {busy=false;break;}
@@ -122,12 +138,18 @@ void ChoirProcessor::prepareDrop(const ChoirSession& s){if(!licensing.canUse())r
  const ScopedLock lock(dataLock);dropFiles=std::move(files);preparedMixRevision=revision;dragDirty=false;
 }
 void ChoirProcessor::importWav(File file){if(isCapturing())return;stop();runJob([this,file]{auto s=std::make_shared<ChoirSession>();s->source=std::make_shared<VocalFile>(readWav(file,cancelled));s->config=config();s->fx=fxConfig();cacheSession(*s);publish(s,true);progress=1;const ScopedLock lock(dataLock);status="Vocal loaded. Choose choir parts and Create Vocals.";});}
+String ChoirProcessor::generationMemorySummary()const{
+ auto s=session();if(!s||!s->source)return "Import a vocal before creating voices.";
+ const auto c=config();const auto retained=retainedStemBytes(*s);const auto resident=std::uint64_t(s->source->audio.getNumSamples())*s->source->audio.getNumChannels()*sizeof(float)+retained;const auto bytes=renderWorkingBytes(s->source->audio.getNumSamples(),s->source->audio.getNumChannels(),c.stereo?2:1,c.singers,retained);
+ return "Estimated render RAM: "+String(double(bytes)/renderMiB,0)+" MiB | safe budget: "+String(double(currentRenderBudget(resident))/renderMiB,0)+" MiB";
+}
 void ChoirProcessor::generate(int regenerate){if(!requireLicense())return;if(isCapturing())return;const auto settings=config();const auto fx=fxConfig();stop();runJob([this,settings,fx,regenerate]{auto c=settings;
  auto old=session();if(!old||!old->source)throw std::runtime_error("Import or capture a vocal first.");
  const auto roles=regenerate>=0?std::vector<Part>{old->stems.at(std::size_t(regenerate)).part}:arrange(c);
  const auto& source=*old->source;const int frames=source.audio.getNumSamples(),channels=c.stereo?2:1;
- const auto budget=juce::int64(frames)*4*(source.audio.getNumChannels()+2*channels*(regenerate>=0?old->stems.size():roles.size()));
- if(budget>512LL*1024*1024)throw std::runtime_error("Source plus generated voices exceed 512 MiB. Use a shorter vocal or fewer singers.");
+ const auto required=renderWorkingBytes(frames,source.audio.getNumChannels(),channels,int(roles.size()),retainedStemBytes(*old));
+ const auto resident=std::uint64_t(frames)*source.audio.getNumChannels()*sizeof(float)+retainedStemBytes(*old);const auto budget=currentRenderBudget(resident);
+ if(required>budget)throw std::runtime_error(("Render needs about "+String(double(required)/renderMiB,0)+" MiB; current safe budget is "+String(double(budget)/renderMiB,0)+" MiB. Reduce singers, select Mono, shorten the vocal or free RAM.").toStdString());
  auto update=[this](String message,float amount){progress=amount;const ScopedLock lock(dataLock);status=std::move(message);};
  update("Analyzing vocal melody...",0);std::vector<float> mono(frames);for(int i=0;i<frames;++i){double x=0;for(int ch=0;ch<source.audio.getNumChannels();++ch)x+=source.audio.getSample(ch,i);mono[i]=float(x/source.audio.getNumChannels());}
  auto melody=analyseMelody(mono.data(),frames,source.rate,cancelled,[&](float amount){progress=.15f*amount;});

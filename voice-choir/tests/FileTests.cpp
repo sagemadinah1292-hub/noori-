@@ -33,6 +33,12 @@ int main(int argc,char** argv){try{using namespace juce;using namespace noori_ch
  p.clearSource();p.startCapture();for(int i=0;i<12;++i){for(int ch=0;ch<2;++ch)for(int n=0;n<256;++n)block.setSample(ch,n,float(.2*std::sin((i*256+n)*.03)));p.processBlock(block,midi);}p.stopCapture();wait(p);check(p.hasSource()&&p.session()->source->audio.getNumSamples()==3072,"Track capture has exact sample count");
  // AIFF is decoded using the actual JUCE reader, not treated as a WAV alias.
  AiffAudioFormat aiff;auto aif=project.getChildFile("vocal.aif");auto stream=aif.createOutputStream();std::unique_ptr<AudioFormatWriter> writer(aiff.createWriterFor(stream.get(),44100,1,16,{},0));check(bool(writer),"AIFF writer");stream.release();check(writer->writeFromAudioSampleBuffer(fixture.audio,0,10000),"AIFF fixture");writer.reset();p.importWav(aif);wait(p);check(p.hasSource()&&p.session()->source->rate==44100,"AIFF import");
+ // Reproduce the user's duration/rate/channel/count: old 512 MiB guard rejects it.
+ {ChoirProcessor large(noori_licensing::Config{});large.setRateAndBufferSizeDetails(48000,256);large.prepareToPlay(48000,256);
+  VocalFile longSource;longSource.rate=48000;longSource.name="Long stereo memory regression";longSource.audio.setSize(2,2982525);longSource.audio.clear();const auto longInput=project.getChildFile("Long-62-seconds.wav");writeWave(longInput,longSource,32,false,cancel);longSource.audio.setSize(0,0);
+  large.importWav(longInput);wait(large);large.setValue("voices",16);large.setValue("reverb",0);large.setValue("lowCut",0);large.generate();wait(large);check(large.stemCount()==16,large.jobStatus().toRawUTF8());for(const auto& stem:large.session()->stems)check(stem.dry->audio.getNumSamples()==2982525&&stem.dry->audio.getNumChannels()==2,"Long 16-singer render keeps duration and stereo");
+  for(const auto& path:large.dragFiles())File(path).deleteFile();cacheRoot().getChildFile(large.session()->cacheId).deleteRecursively();
+ }
  check(out.getChildFile("choir-files.ok").replaceWithText("PASS WAV/AIFF, musical stems, synchronized preview, Post FX, BWF/float export, persistent cache, concurrent restore, capture, regenerate and cancellation.\n"),"Test marker");
  std::cout<<"PASS complete choir file and processor workflow\n";return 0;
 }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}

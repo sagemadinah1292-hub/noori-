@@ -20,6 +20,7 @@ public:
  void getStateInformation(juce::MemoryBlock&)override;void setStateInformation(const void*,int)override;
  void setValue(const juce::String&,float);float value(const char*)const;
  noori_choir::ChoirConfig config()const;noori_choir::FxConfig fxConfig()const;
+ juce::String generationMemorySummary()const;
  void importWav(juce::File);void generate(int regenerate=-1);void applyFx();void prepareStems();
  void exportTo(juce::File,int selected=-1);void clearSource();void removeStem(int);
  void cancelJob(){cancelled=true;}bool isBusy()const{return busy.load();}float jobProgress()const{return progress.load();}

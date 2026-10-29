@@ -145,7 +145,7 @@ jobs:
         run: ./voice-choir/scripts/BuildInstaller.ps1
       - name: Bundle authenticated portal with private plugin downloads
         shell: pwsh
-        run: python activation-service/scripts/package-website.py --installer dist-choir/NOORI_CHOIR_Setup_x64.exe --vst3-package dist-choir/Noori-Choir-0.4.4-Windows-x64.zip --build-info dist-choir/Noori-Choir-0.4.4-Windows-x64/BUILD-INFO.json --installer-tests dist-choir/INSTALLER-TEST-RESULTS.json --preview build-choir/Preview-Results.png
+        run: python activation-service/scripts/package-website.py --installer dist-choir/NOORI_CHOIR_Setup_x64.exe --vst3-package dist-choir/Noori-Choir-0.4.5-Windows-x64.zip --build-info dist-choir/Noori-Choir-0.4.5-Windows-x64/BUILD-INFO.json --installer-tests dist-choir/INSTALLER-TEST-RESULTS.json --preview build-choir/Preview-Results.png
       - name: Upload final authenticated website
         uses: actions/upload-artifact@v4
         with:
@@ -167,8 +167,8 @@ jobs:
       - name: Upload tested Windows x64 VST3 package
         uses: actions/upload-artifact@v4
         with:
-          name: Noori-Choir-0.4.4-Windows-x64
-          path: dist-choir/Noori-Choir-0.4.4-Windows-x64.zip
+          name: Noori-Choir-0.4.5-Windows-x64
+          path: dist-choir/Noori-Choir-0.4.5-Windows-x64.zip
           if-no-files-found: error
       - name: Upload UI previews
         uses: actions/upload-artifact@v4

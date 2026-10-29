@@ -1,9 +1,13 @@
 #include "ChoirEngine.h"
+#include "RenderMemory.h"
 #include <iostream>
 #include <stdexcept>
 using namespace noori_choir;
 void check(bool b,const char* s){if(!b)throw std::runtime_error(s);}
-int main(){try{for(double rate:{44100.,48000.,96000.}){
+int main(){try{
+ const auto realCase=renderWorkingBytes(2982525,2,2,16);check(realCase>512*renderMiB&&realCase<1024*renderMiB,"62.14 second stereo/16-singer case needs more than old cap, under 1 GiB working budget");
+ check(renderBudgetForAvailable(2ULL*1024*renderMiB,512*renderMiB)==1536*renderMiB,"Already-resident buffers do not consume the additional-RAM allowance twice");check(realCase<renderBudgetForAvailable(2ULL*1024*renderMiB),"Real reported case fits with 2 GiB available RAM");check(realCase>renderBudgetForAvailable(1024*renderMiB),"Do not accept reported case when RAM is actually tight");check(renderBudgetForAvailable(64ULL*1024*renderMiB)==2ULL*1024*renderMiB,"Hard cap remains bounded on large machines");
+ for(double rate:{44100.,48000.,96000.}){
  Engine e;e.prepare(rate);Settings s;s.mix=0;s.gain=0;
  std::vector<float> l(20000),r(20000);l[0]=.75f;r[0]=-.25f;e.process(l.data(),r.data(),int(l.size()),s);for(int i=0;i<int(l.size());++i){check(std::abs(l[i]-(i==e.latencySamples()?.75f:0.f))<1e-7,"Dry left latency");check(std::abs(r[i]-(i==e.latencySamples()?-.25f:0.f))<1e-7,"Dry right latency");}
  s.mix=100;s.gain=-6;s.voices=16;s.detune=20;s.timing=30;s.width=100;e.reset();
