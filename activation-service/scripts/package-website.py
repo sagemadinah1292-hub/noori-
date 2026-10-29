@@ -49,7 +49,7 @@ if args.preview:
     preview=args.preview.read_bytes()
     if preview[:8]!=b'\x89PNG\r\n\x1a\n':raise SystemExit('Invalid plugin preview PNG.')
     public_files['assets/plugin-preview.png']=preview
-private_files={name:(root/'php/private'/name).read_bytes() for name in ['portal.php','portal-deploy.php']}
+private_files={name:(root/'php/private'/name).read_bytes() for name in ['service.php','portal.php','portal-deploy.php']}
 private_files['AUTOMATIC-TRIAL-UPGRADE.txt']=(root/'php/AUTOMATIC-TRIAL-UPGRADE.md').read_bytes()
 public_files['AUTOMATIC-TRIAL-UPGRADE.txt']=(root/'php/AUTOMATIC-TRIAL-UPGRADE.md').read_bytes()
 private_files.update({
@@ -138,7 +138,7 @@ public_html/
   index.html (redirect to /noori-activation if an old NOORI homepage was found)
   noori-activation/
     index.php, index.html (redirect), home.php, login.php, account.php
-    register.php, create-password.php, dashboard.php, download.php, logout.php, change-password.php, reset-password.php
+    register.php, create-password.php, verify-email.php, dashboard.php, download.php, logout.php, change-password.php, reset-password.php
     admin.php, secure-downloads.php, portal-bootstrap.php, bootstrap.php, .htaccess
     assets/
 
