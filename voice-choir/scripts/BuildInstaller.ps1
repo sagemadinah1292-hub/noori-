@@ -1,6 +1,6 @@
 param([string]$OutputDir='dist-choir')
 $ErrorActionPreference='Stop'
-$package=Join-Path $OutputDir 'Noori-Choir-0.4.2-Windows-x64'
+$package=Join-Path $OutputDir 'Noori-Choir-0.4.3-Windows-x64'
 $compiler=Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6/ISCC.exe'
 if (!(Test-Path $compiler)) {throw 'Inno Setup 6 is required to compile the installer.'}
 $buildInfo=Get-Content (Join-Path $package 'BUILD-INFO.json') -Raw | ConvertFrom-Json

@@ -55,7 +55,7 @@ inline juce::StringArray exportSession(const ChoirSession& session,const juce::F
   if(selected==-2){ // explicit combined mix, separate from the all-stems path
    VocalFile combined;combined.rate=session.source->rate;combined.sampleOffset=session.source->sampleOffset;combined.audio.setSize(session.config.stereo?2:1,session.source->audio.getNumSamples());combined.audio.clear();
    bool anySolo=std::any_of(mix.begin(),mix.end(),[](auto m){return m.solo;});
-   for(int v=0;v<int(session.stems.size());++v){auto m=mix[v];if(m.mute||(anySolo&&!m.solo))continue;const auto& data=printFx?*session.stems[v].wet:*session.stems[v].dry;const float gain=std::pow(10.f,m.gain/20.f)/std::sqrt(float(session.stems.size()));
+   for(int v=0;v<int(session.stems.size());++v){auto m=mix[v];if(m.mute||(anySolo&&!m.solo))continue;const auto& data=printFx?*session.stems[v].wet:*session.stems[v].dry;const float gain=std::pow(10.f,m.gain/20.f)/float(session.stems.size());
     for(int ch=0;ch<combined.audio.getNumChannels();++ch){float pan=combined.audio.getNumChannels()==1?1.f:std::sqrt(std::max(0.f,ch==0?1-m.pan:1+m.pan));combined.audio.addFrom(ch,0,data.audio,std::min(ch,data.audio.getNumChannels()-1),0,combined.audio.getNumSamples(),gain*pan);}
    }
    writeWave(staging.getChildFile("NOORI_CHOIR_Mix_"+id+".wav"),combined,bits,bwf,cancelled);

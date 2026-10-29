@@ -76,7 +76,7 @@ ChoirEditor::ChoirEditor(ChoirProcessor& processor):AudioProcessorEditor(process
  for(int i=0;i<6;++i){add(parts[i],partIds[i]);parts[i].setButtonText(partText[i]);parts[i].setClickingTogglesState(true);buttonAttachments.push_back(std::make_unique<AudioProcessorValueTreeState::ButtonAttachment>(p.state,partIds[i],parts[i]));}
  hookSlider(masterGain,"masterGain",-36,6," dB");hookSlider(lowCut,"lowCut",0,500," Hz");hookSlider(brightness,"brightness",-12,12," dB");hookSlider(reverb,"reverb",0,1,"");hookSlider(variation,"detune",0,20," cents");
  for(auto* s:{&lowCut,&brightness,&reverb}){s->onDragEnd=[this]{if(p.stemCount()>0&&!p.isBusy()){renderedFx=p.fxConfig();p.applyFx();}};s->onValueChange=[this]{fxChangedAt=Time::getMillisecondCounterHiRes();};}
- add(printFx,"printFx");add(floatWav,"floatWav");add(bwf,"bwf");buttonAttachments.push_back(std::make_unique<AudioProcessorValueTreeState::ButtonAttachment>(p.state,"printFx",printFx));buttonAttachments.push_back(std::make_unique<AudioProcessorValueTreeState::ButtonAttachment>(p.state,"floatWav",floatWav));buttonAttachments.push_back(std::make_unique<AudioProcessorValueTreeState::ButtonAttachment>(p.state,"bwf",bwf));for(auto* b:{&printFx,&floatWav,&bwf})b->onClick=[this]{p.invalidateStems();};
+ add(autoKey,"autoKey");buttonAttachments.push_back(std::make_unique<AudioProcessorValueTreeState::ButtonAttachment>(p.state,"autoKey",autoKey));add(printFx,"printFx");add(floatWav,"floatWav");add(bwf,"bwf");buttonAttachments.push_back(std::make_unique<AudioProcessorValueTreeState::ButtonAttachment>(p.state,"printFx",printFx));buttonAttachments.push_back(std::make_unique<AudioProcessorValueTreeState::ButtonAttachment>(p.state,"floatWav",floatWav));buttonAttachments.push_back(std::make_unique<AudioProcessorValueTreeState::ButtonAttachment>(p.state,"bwf",bwf));for(auto* b:{&printFx,&floatWav,&bwf})b->onClick=[this]{p.invalidateStems();};
  add(licenseBadge,"licenseBadge");add(activationButton,"activation");add(activateKey,"activateKey");add(checkKey,"checkKey");add(removeKey,"removeKey");add(licenseEmail,"licenseEmail");add(licenseSerial,"licenseSerial");add(licenseStatus,"licenseStatus");add(licenseExpiry,"licenseExpiry");add(deviceLabel,"deviceId");
  licenseEmail.setTextToShowWhenEmpty("Your registered email",Colour(0xff8faaa2));licenseEmail.setMultiLine(false);licenseSerial.setTextToShowWhenEmpty("NOORI-T-... or NOORI-F-...",Colour(0xff8faaa2));licenseSerial.setMultiLine(false);licenseSerial.setPasswordCharacter('*');
  licenseEmail.setText(p.licensing.snapshot().email,dontSendNotification);licenseStatus.setJustificationType(Justification::centredLeft);licenseExpiry.setJustificationType(Justification::centredLeft);deviceLabel.setJustificationType(Justification::centredLeft);
@@ -107,7 +107,8 @@ void ChoirEditor::resized(){
  sourcePlay.setBounds(22,137,57,35);sourceMute.setBounds(22,179,57,32);sourceWave->setBounds(90,132,604,83);removeSource.setBounds(652,139,34,28);sourceName.setBounds(88,218,606,30);
  if(page==Page::Import){browse.setBounds(234,620,252,48);capture.setBounds(234,690,252,42);}else {browse.setBounds(90,264,226,40);capture.setBounds(338,264,356,40);}
  if(page==Page::Import)character.setBounds(164,342,392,44);else character.setBounds(244,340,450,42);microphone.setBounds(244,395,450,42);singers.setBounds(244,450,212,42);output.setBounds(478,450,216,42);
- parts[0].setBounds(244,512,212,40);parts[1].setBounds(478,512,216,40);key.setBounds(244,572,212,40);scale.setBounds(478,572,216,40);
+ autoKey.setBounds(244,552,450,28);if(page==Page::Import)autoKey.setBounds(164,430,392,32);
+ parts[0].setBounds(244,512,212,40);parts[1].setBounds(478,512,216,40);key.setBounds(244,586,212,36);scale.setBounds(478,586,216,36);
  parts[2].setBounds(244,627,212,40);parts[3].setBounds(478,627,216,40);parts[4].setBounds(244,682,212,40);parts[5].setBounds(478,682,216,40);
  create.setBounds(244,780,450,66);cancel.setBounds(250,715,220,44);progressLabel.setBounds(150,570,420,90);progressLabel.setFont(FontOptions(55.f));progressLabel.setJustificationType(Justification::centred);
  playAll.setBounds(40,130,86,86);stopAll.setBounds(184,140,100,64);masterGain.setBounds(316,126,118,116);viewport.setBounds(18,274,684,438);lanes.setSize(664,int(rows.size())*144);for(int i=0;i<int(rows.size());++i)rows[i]->setBounds(0,i*144,664,144);
@@ -121,8 +122,8 @@ void ChoirEditor::resized(){
 void ChoirEditor::showPage(Page next){page=next;updateVisibility();resized();canvas->repaint();}
 void ChoirEditor::updateVisibility(){for(int i=0;i<canvas->getNumChildComponents();++i)canvas->getChildComponent(i)->setVisible(false);settingsButton.setVisible(true);status.setVisible(true);licenseBadge.setVisible(true);back.setVisible(page==Page::Setup||page==Page::Results||page==Page::Settings||page==Page::Activation);back.setButtonText(page==Page::Setup?"START OVER":"BACK");
  auto show=[](std::initializer_list<Component*> items){for(auto* c:items)c->setVisible(true);};
- if(page==Page::Import)show({&browse,&capture,&character});
- if(page==Page::Setup){show({&browse,&capture,&sourcePlay,&sourceMute,&removeSource,sourceWave.get(),&sourceName,&character,&microphone,&singers,&key,&scale,&output,&create});for(auto& b:parts)b.setVisible(true);removeSource.toFront(false);}
+ if(page==Page::Import)show({&browse,&capture,&character,&autoKey});
+ if(page==Page::Setup){show({&browse,&capture,&sourcePlay,&sourceMute,&removeSource,sourceWave.get(),&sourceName,&character,&microphone,&singers,&key,&scale,&output,&create,&autoKey});for(auto& b:parts)b.setVisible(true);removeSource.toFront(false);}
  if(page==Page::Processing)show({&cancel,&progressLabel});
  if(page==Page::Results)show({&playAll,&stopAll,&masterGain,&viewport,&lowCut,&brightness,&reverb,&printFx,&exportAll,&exportMix,&openFolder,stemsButton.get()});
  if(page==Page::Settings){show({&theme,&scaling,&floatWav,&bwf,&variation,&activationButton});for(auto& note:customNotes)note.setVisible(true);}
@@ -148,6 +149,7 @@ void ChoirEditor::timerCallback(){
  capture.setButtonText(p.isCapturing()?"STOP CAPTURE  "+String(p.capturedSeconds(),1)+" s":"CAPTURE FROM TRACK");
  for(auto* c:std::initializer_list<Component*>{&browse,&capture,&create,&removeSource,&exportAll,&exportMix,&character,&microphone,&singers,&key,&scale,&output})c->setEnabled(!p.isBusy());
  for(auto* control:std::initializer_list<Component*>{&printFx,&floatWav,&bwf})control->setEnabled(!p.isBusy());
+ key.setEnabled(!p.isBusy()&&p.value("autoKey")<.5f);scale.setEnabled(!p.isBusy()&&p.value("autoKey")<.5f);autoKey.setEnabled(!p.isBusy());
  back.setEnabled(!p.isBusy()&&!p.isCapturing());create.setEnabled(allowed&&!p.isBusy()&&!p.isCapturing());
  stemsButton->setEnabled(!p.isBusy()&&p.stemCount()>0);stemsButton->setButtonText(p.stemsNeedPreparation()?"PREPARE STEMS":"STEMS - DRAG TO CUBASE");
  for(auto& row:rows)row->refresh();auto position=p.isPlaying()&&p.playingVoice()==-2?p.playhead():-1;if(sourceWave->position!=position){sourceWave->position=position;sourceWave->repaint();}
