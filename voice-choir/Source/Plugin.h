@@ -44,6 +44,9 @@ private:
  std::atomic<unsigned long long> mixRevision{0},preparedMixRevision{~0ULL};
  std::atomic<int> dataRevision{0};std::atomic<bool> dragDirty{true};
  mutable juce::CriticalSection previewLock;std::shared_ptr<const noori_choir::ChoirSession> preview;
+ juce::Reverb previewReverb;juce::SmoothedValue<float> cutSmooth,brightSmooth,wetSmooth;
+ std::array<double,2> fxX{},fxY{},fxLow{};
+ void processPreviewFx(juce::AudioBuffer<float>&);
  std::atomic<int> playbackMode{-3};std::atomic<bool> rewind{false};double cursor=0;
  std::atomic<double> previewFrame{0},hostRate{48000};
  struct AtomicMix {std::atomic<float> gain{0},pan{0};std::atomic<bool> mute{false},solo{false};};
@@ -52,7 +55,7 @@ private:
  std::atomic<int> capturedFrames{0};int captureChannels=1;juce::int64 captureOffset=0;
  std::function<void()> pendingJob;std::atomic<bool> shuttingDown{false};
  bool requireLicense();
- void runJob(std::function<void()>,bool replace=false);void publish(std::shared_ptr<noori_choir::ChoirSession>,bool resetMix=false);
+ void runJob(std::function<void()>,bool replace=false);void publish(std::shared_ptr<noori_choir::ChoirSession>,bool resetMix=false,bool preservePlayback=false);
  void cacheSession(noori_choir::ChoirSession&);void restoreCache(juce::String,std::vector<noori_choir::StemMix>);
  void prepareDrop(const noori_choir::ChoirSession&);std::vector<noori_choir::StemMix> mixSnapshot(int)const;
 };

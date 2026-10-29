@@ -1,0 +1,6 @@
+<?php
+declare(strict_types=1);
+require __DIR__.'/portal-bootstrap.php';$error='';$done=false;
+$email=(string)($_POST['email']??$_GET['email']??'');$code=(string)($_POST['code']??$_GET['code']??'');
+if($_SERVER['REQUEST_METHOD']==='POST')try{nooriCsrf();nooriRate($service,'verify-email',6);$u=$portal->verifyAndStartTrial($email,$code,$service,time());$done=true;if($friend&&$friend['id']===$u['id']){nooriSignIn($u);nooriRedirect('dashboard.php');}}catch(Throwable $e){$error=nooriErrorText($e);}
+nooriPageStart('Confirm email',$friend);?><section class="account-wrap wrap"><div class="account-card"><h1>Confirm your email</h1><p role="status"><?=esc($error)?></p><?php if($done):?><p>Email confirmed. Your trial serial is ready. <a href="login.php">Sign in to your account</a>.</p><?php else:?><p>Confirm <?=esc($email)?> to receive your automatic trial. It starts when you activate the plugin and ends 72 hours later, even if the plugin stays closed.</p><form method="post"><?php nooriFormToken();?><input type="hidden" name="email" value="<?=esc($email)?>"><input type="hidden" name="code" value="<?=esc($code)?>"><button class="button">Confirm email and create trial</button></form><?php endif;?></div></section><?php nooriPageEnd();

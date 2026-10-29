@@ -6,6 +6,7 @@ final class NooriPortal {
   $db->setAttribute(PDO::ATTR_ERRMODE,PDO::ERRMODE_EXCEPTION);
   $db->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE,PDO::FETCH_ASSOC);
   $db->exec("CREATE TABLE IF NOT EXISTS noori_requests (id VARCHAR(36) PRIMARY KEY,email VARCHAR(254) NOT NULL UNIQUE,password_hash VARCHAR(255) NOT NULL,created_at BIGINT NOT NULL,auth_version INT NOT NULL DEFAULT 1,approved INT NOT NULL DEFAULT 0,notification_status VARCHAR(32) NOT NULL DEFAULT 'not_sent',reset_hash VARCHAR(64) NULL,reset_expires_at BIGINT NULL)");
+  $db->exec("CREATE TABLE IF NOT EXISTS noori_email_tokens(account_id VARCHAR(36) PRIMARY KEY,token_hash VARCHAR(64) NOT NULL,expires_at BIGINT NOT NULL)");
   if($db->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql'){
    $db->setAttribute(PDO::ATTR_EMULATE_PREPARES,false);
    $db->exec("CREATE TABLE IF NOT EXISTS noori_accounts (id CHAR(36) PRIMARY KEY,email VARCHAR(254) COLLATE utf8mb4_bin NOT NULL UNIQUE,password_hash VARCHAR(255) NOT NULL,license_id CHAR(36) NOT NULL UNIQUE,created_at BIGINT NOT NULL,last_login_at BIGINT NULL,auth_version INT NOT NULL DEFAULT 1,reset_hash CHAR(64) NULL,reset_expires_at BIGINT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
@@ -20,13 +21,45 @@ final class NooriPortal {
   $id=NooriService::uuid();try{$q=$this->db->prepare('INSERT INTO noori_requests(id,email,password_hash,created_at) VALUES(?,?,?,?)');$q->execute([$id,$email,password_hash($password,PASSWORD_DEFAULT),$now]);}catch(PDOException $e){if(in_array((string)$e->getCode(),['23000','19'],true))throw new NooriError(409,'An account already exists. Sign in.');throw $e;}
   return $this->account($id)??throw new RuntimeException('Account unavailable.');
  }
+ public function verification(string $id,int $now):string {
+  $u=$this->account($id);if(!$u||$u['kind']!=='pending')throw new NooriError(400,'This account does not need verification.');
+  $token=bin2hex(random_bytes(32));$this->db->beginTransaction();try{
+   $s=$this->db->prepare('DELETE FROM noori_email_tokens WHERE account_id=?');$s->execute([$id]);$s=$this->db->prepare('INSERT INTO noori_email_tokens(account_id,token_hash,expires_at) VALUES(?,?,?)');$s->execute([$id,hash('sha256',$token),$now+86400]);$this->db->commit();return $token;
+  }catch(Throwable $e){if($this->db->inTransaction())$this->db->rollBack();throw $e;}
+ }
+ public function verifyAndStartTrial(string $email,string $token,NooriService $service,int $now):array {
+  $email=NooriService::email($email);if($email===null||!preg_match('/^[a-f0-9]{64}$/D',$token))throw new NooriError(403,'Verification link is invalid or expired.');
+  $this->db->beginTransaction();try{
+   $q=$this->db->prepare($this->locked('SELECT * FROM noori_requests WHERE email=?'));$q->execute([$email]);$r=$q->fetch();if(!$r||(int)$r['approved']!==0)throw new NooriError(403,'Account already verified or unavailable. Sign in.');
+   $q=$this->db->prepare($this->locked('SELECT * FROM noori_email_tokens WHERE account_id=?'));$q->execute([$r['id']]);$t=$q->fetch();if(!$t||(int)$t['expires_at']<=$now||!hash_equals($t['token_hash'],hash('sha256',$token)))throw new NooriError(403,'Verification link is invalid or expired.');
+   // Never issue another trial for an existing email, including expired/revoked keys.
+   $q=$this->db->prepare('SELECT id FROM noori_licenses WHERE email=?');$q->execute([$email]);if($q->fetch())throw new NooriError(409,'A key already exists for this email. Sign in and use your existing serial or contact NOORI.');
+   $license=NooriService::uuid();$serial=$service->automaticSerial($license,$email);
+   $q=$this->db->prepare('INSERT INTO noori_licenses(id,email,key_hash,key_hint,kind,created_at) VALUES(?,?,?,?,?,?)');$q->execute([$license,$email,hash('sha256',$serial),substr($serial,-8),'trial',$now]);
+   $q=$this->db->prepare('INSERT INTO noori_accounts(id,email,password_hash,license_id,created_at,auth_version) VALUES(?,?,?,?,?,?)');$q->execute([$r['id'],$email,$r['password_hash'],$license,$r['created_at'],$r['auth_version']+1]);
+   $q=$this->db->prepare('UPDATE noori_requests SET approved=1 WHERE id=?');$q->execute([$r['id']]);$q=$this->db->prepare('DELETE FROM noori_email_tokens WHERE account_id=?');$q->execute([$r['id']]);$this->db->commit();return $this->account($r['id']);
+  }catch(Throwable $e){if($this->db->inTransaction())$this->db->rollBack();throw $e;}
+ }
+ public function automaticKey(array $account,NooriService $service):?string {
+  if($account['kind']==='pending')return null;$serial=$service->automaticSerial($account['license_id'],$account['email']);$q=$this->db->prepare('SELECT key_hash FROM noori_licenses WHERE id=?');$q->execute([$account['license_id']]);$hash=$q->fetchColumn();return is_string($hash)&&hash_equals($hash,hash('sha256',$serial))?$serial:null;
+ }
+ public function sendVerification(array $account, array $settings,int $now):bool {
+  $code=$this->verification($account['id'],$now);global $config;
+  return nooriSendMail($account['email'],'NOORI: confirm your email',"Confirm your email to receive your automatic three-day trial and serial.\n".$config['public_url'].'/verify-email.php?email='.rawurlencode($account['email']).'&code='.$code."\nLink expires in 24 hours. Trial time starts on first plugin activation.\n",$settings);
+ }
+ public function sendRecovery(string $email,array $settings,int $now):void {
+  $email=NooriService::email($email);if($email===null)return;
+  $q=$this->db->prepare('SELECT id FROM noori_accounts WHERE email=?');$q->execute([$email]);$id=$q->fetchColumn();if(!$id){$q=$this->db->prepare('SELECT id FROM noori_requests WHERE email=? AND approved=0');$q->execute([$email]);$id=$q->fetchColumn();}if(!$id)return;
+  $code=$this->recovery($id,$now);global $config;
+  nooriSendMail($email,'NOORI: reset your password',"Use this one-time link within 15 minutes:\n".$config['public_url'].'/reset-password.php?email='.rawurlencode($email).'&code='.$code."\nIf you did not request a reset, ignore this message.\n",$settings);
+ }
  public function requests():array {return $this->db->query('SELECT id,email,created_at,notification_status FROM noori_requests WHERE approved=0 ORDER BY created_at DESC LIMIT 1000')->fetchAll();}
  public function notifyOwner(array $user,array $config):bool {
   $recipient=(string)($config['owner_notification_email']??'shahidulhaq@live.com');
   $sender=(string)($config['notification_from']??'');$sent=false;
   if(filter_var($recipient,FILTER_VALIDATE_EMAIL)&&filter_var($sender,FILTER_VALIDATE_EMAIL)&&!preg_match('/[\r\n]/',$recipient.$sender)){
-   $body="A new NOORI account is awaiting your approval.\nEmail: ".$user['email']."\nSign in through your NOORI website to review it.\nNo download access has been granted.\n";
-   try{$sent=function_exists('mail')&&@mail($recipient,'NOORI: new account awaiting approval',$body,'From: '.$sender."\r\nContent-Type: text/plain; charset=UTF-8");}catch(Throwable){$sent=false;}
+   $body="A new NOORI account has registered. Its email confirmation is pending.\nEmail: ".$user['email']."\nSign in through your NOORI website to review it.\nNo download access has been granted.\n";
+   try{$sent=function_exists('mail')&&@mail($recipient,'NOORI: new account registered',$body,'From: '.$sender."\r\nContent-Type: text/plain; charset=UTF-8");}catch(Throwable){$sent=false;}
   }
   $q=$this->db->prepare('UPDATE noori_requests SET notification_status=? WHERE id=?');$q->execute([$sent?'accepted_by_mail_server':'not_sent',$user['id']]);return $sent;
  }
@@ -156,4 +189,9 @@ function nooriNotificationSettings():array {
 function nooriSaveNotificationSender(string $sender):void {
  global $privateDir;if(!filter_var($sender,FILTER_VALIDATE_EMAIL)||preg_match('/[\r\n]/',$sender))throw new NooriError(400,'Enter your authorized hosting sender email.');
  $file=$privateDir.'/notification-settings.json';if(file_put_contents($file,json_encode(['notification_from'=>$sender],JSON_THROW_ON_ERROR),LOCK_EX)===false)throw new NooriError(503,'Cannot save notification settings.');@chmod($file,0600);
+}
+
+function nooriSendMail(string $to,string $subject,string $body,array $settings):bool {
+ $from=(string)($settings['notification_from']??'');if(!filter_var($to,FILTER_VALIDATE_EMAIL)||!filter_var($from,FILTER_VALIDATE_EMAIL)||preg_match('/[\r\n]/',$from.$to.$subject))return false;
+ try{return function_exists('mail')&&@mail($to,$subject,$body,'From: '.$from."\r\nContent-Type: text/plain; charset=UTF-8");}catch(Throwable){return false;}
 }

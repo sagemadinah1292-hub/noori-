@@ -18,7 +18,7 @@ struct Grant {
  juce::String email,deviceId,licenseId,error;
 };
 struct Snapshot {
- bool configured=false,busy=false,active=false,trial=false;
+ bool configured=false,busy=false,active=false,trial=false,registered=false;
  juce::String message,email,deviceId;
  juce::int64 trialExpiresAt=0;
 };

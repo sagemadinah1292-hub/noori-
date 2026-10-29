@@ -46,3 +46,21 @@ ok(!$portal->notifyOwner($portal->pendingRegistration('notice@example.com',$pass
 $requests=$portal->requests();ok(count($requests)===1&&$requests[0]['notification_status']==='not_sent','Pending notification failure is visible to owner.');
 $reset=$portal->recovery($requests[0]['id'],$now);$portal->reset('notice@example.com',$reset,'Pending-reset-123!',$now+1);ok($portal->login('notice@example.com','Pending-reset-123!',$now+1)['kind']==='pending','Pending recovery never approves downloads.');
 echo "PASS notification failure status and pending password recovery\n";
+
+$auto=$portal->pendingRegistration('autotrial@example.com',$password,$now);
+$token=$portal->verification($auto['id'],$now);
+denied(fn()=>$portal->verifyAndStartTrial('autotrial@example.com',str_repeat('f',64),$service,$now),403);
+denied(fn()=>$portal->verifyAndStartTrial('autotrial@example.com',$token,$service,$now+86400),403);
+$auto=$portal->verifyAndStartTrial('autotrial@example.com',$token,$service,$now+1);
+ok($auto['kind']==='trial'&&$auto['expires_at']===null,'Verified email automatically gets one trial, not yet started.');
+$autoSerial=$portal->automaticKey($auto,$service);ok(is_string($autoSerial),'Logged-in user can retrieve personal automatic serial.');
+denied(fn()=>$portal->verifyAndStartTrial('autotrial@example.com',$token,$service,$now+1),403);
+denied(fn()=>$portal->pendingRegistration('AUTOTRIAL@example.com',$password,$now+2),409);
+for($n=0;$n<3;$n++)ok($portal->login(' AUTOTRIAL@example.com ',$password,$now+2)['id']===$auto['id'],'Original signup password survives verification and repeated logins.');
+$autoBody=['email'=>'autotrial@example.com','serial'=>$autoSerial,'deviceId'=>str_repeat('c',64),'nonce'=>str_repeat('d',32)];
+$service->activate($autoBody,true,$now+3);
+denied(fn()=>$service->activate([...$autoBody,'deviceId'=>str_repeat('e',64)],true,$now+4),403);
+denied(fn()=>$service->activate($autoBody,true,$now+3+259200),403);
+$service->change($auto['license_id'],'reset');denied(fn()=>$service->activate($autoBody,true,$now+3+259200),403);
+$service->change($auto['license_id'],'full');ok($portal->automaticKey($portal->account($auto['id']),$service)===$autoSerial,'Owner full upgrade keeps the same serial.');
+echo "PASS automatic verified trial, persistent login, single email, fixed 72h expiry while closed, device lock and full upgrade\n";

@@ -43,13 +43,15 @@ version=str(info['version'])
 if info.get('licensing_enforced') is not True:
     raise SystemExit('The final portal only publishes protected plugin builds.')
 if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+',version):raise SystemExit('Unexpected release version.')
-public_names=['index.php','index.html','home.php','login.php','account.php','register.php','create-password.php','dashboard.php','download.php','logout.php','change-password.php','reset-password.php','secure-downloads.php','portal-bootstrap.php','admin.php','.htaccess','assets/site.css','assets/noori-logo.svg']
+public_names=['index.php','index.html','home.php','login.php','account.php','register.php','create-password.php','verify-email.php','dashboard.php','download.php','logout.php','change-password.php','reset-password.php','secure-downloads.php','portal-bootstrap.php','admin.php','.htaccess','assets/site.css','assets/noori-logo.svg']
 public_files={name:(public/name).read_bytes() for name in public_names}
 if args.preview:
     preview=args.preview.read_bytes()
     if preview[:8]!=b'\x89PNG\r\n\x1a\n':raise SystemExit('Invalid plugin preview PNG.')
     public_files['assets/plugin-preview.png']=preview
 private_files={name:(root/'php/private'/name).read_bytes() for name in ['portal.php','portal-deploy.php']}
+private_files['AUTOMATIC-TRIAL-UPGRADE.txt']=(root/'php/AUTOMATIC-TRIAL-UPGRADE.md').read_bytes()
+public_files['AUTOMATIC-TRIAL-UPGRADE.txt']=(root/'php/AUTOMATIC-TRIAL-UPGRADE.md').read_bytes()
 private_files.update({
     'downloads/NOORI_CHOIR_Setup_x64.exe':args.installer.read_bytes(),
     'downloads/NOORI-CHOIR-Windows-x64.zip':args.vst3_package.read_bytes(),
@@ -109,14 +111,11 @@ guide="""NOORI FINAL PORTAL UPGRADE — preserve your existing setup
    private backup. Nothing is deleted. Unrelated .private, default.php and llms.txt
    are preserved. The root .htaccess is backed up and receives a NOORI archive guard.
    Resolve any reported errors before allowing friends to download.
-6. In an incognito window register your email, then create a password. Your
-   account must show Awaiting owner approval and downloads must return 403.
-   In the owner dashboard set your authorized hosting sender email under
-   Registration notifications. Recipient defaults to shahidulhaq@live.com.
-   Retry notification and verify real inbox receipt; server acceptance is not
-   delivery confirmation. Generate ONE key assigned to the requesting email,
-   keep its CSV private, and enter that final key in the user dashboard.
-   Only then should the installer download. Use the same key in the plugin.
+6. Read AUTOMATIC-TRIAL-UPGRADE.txt. In an incognito window register email and
+   password, confirm the automatically emailed link, sign in with the SAME
+   password, and verify your automatic serial and download. No owner key issue
+   is needed for a new trial. Test automatic Forgot password email as well.
+   Full access remains an owner action. Existing manually issued keys are valid.
 7. While signed out verify dashboard.php and download.php?file=installer ask for
    sign-in. Old /downloads/...exe and NOORI-Website-With-Plugin.zip links at BOTH
    the domain root and /noori-activation must return 403 or 404.

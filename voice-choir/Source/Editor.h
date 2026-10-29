@@ -6,7 +6,7 @@ public:
  explicit ChoirEditor(ChoirProcessor&);~ChoirEditor()override;
  void resized()override;void paint(juce::Graphics&)override;
  bool isInterestedInFileDrag(const juce::StringArray&)override;void filesDropped(const juce::StringArray&,int,int)override;
- void showPage(Page);Page visiblePage()const{return page;}bool hasBrandLogo()const{return brandLogo!=nullptr;}
+ void showPage(Page);Page visiblePage()const{return page;}bool hasBrandLogo()const{return brandLogo!=nullptr;}juce::String accessLabel()const{return licenseBadge.getText();}
 private:
  class GoldLook;class Canvas;class WaveDisplay;class SingerRow;class StemDragButton;
  ChoirProcessor& p;std::unique_ptr<GoldLook> look;std::unique_ptr<Canvas> canvas;
@@ -23,7 +23,7 @@ private:
  std::array<juce::TextButton,6> parts;std::array<juce::TextButton,12> customNotes;
  juce::ToggleButton printFx{"PRINT POST FX TO STEMS"},floatWav{"32-bit float WAV (off = 24-bit PCM)"},bwf{"Include source BWF timestamp"};
  juce::Slider masterGain,lowCut,brightness,reverb,variation;
- juce::Label status,sourceName,progressLabel;
+ juce::Label status,sourceName,progressLabel,licenseBadge;
  juce::Viewport viewport;juce::Component lanes;std::vector<std::unique_ptr<SingerRow>> rows;
  std::vector<std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>> sliderAttachments;
  std::vector<std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment>> comboAttachments;

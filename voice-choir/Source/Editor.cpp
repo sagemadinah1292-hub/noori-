@@ -77,7 +77,7 @@ ChoirEditor::ChoirEditor(ChoirProcessor& processor):AudioProcessorEditor(process
  hookSlider(masterGain,"masterGain",-36,6," dB");hookSlider(lowCut,"lowCut",0,500," Hz");hookSlider(brightness,"brightness",-12,12," dB");hookSlider(reverb,"reverb",0,1,"");hookSlider(variation,"detune",0,20," cents");
  for(auto* s:{&lowCut,&brightness,&reverb}){s->onDragEnd=[this]{if(p.stemCount()>0&&!p.isBusy()){renderedFx=p.fxConfig();p.applyFx();}};s->onValueChange=[this]{fxChangedAt=Time::getMillisecondCounterHiRes();};}
  add(printFx,"printFx");add(floatWav,"floatWav");add(bwf,"bwf");buttonAttachments.push_back(std::make_unique<AudioProcessorValueTreeState::ButtonAttachment>(p.state,"printFx",printFx));buttonAttachments.push_back(std::make_unique<AudioProcessorValueTreeState::ButtonAttachment>(p.state,"floatWav",floatWav));buttonAttachments.push_back(std::make_unique<AudioProcessorValueTreeState::ButtonAttachment>(p.state,"bwf",bwf));for(auto* b:{&printFx,&floatWav,&bwf})b->onClick=[this]{p.invalidateStems();};
- add(activationButton,"activation");add(activateKey,"activateKey");add(checkKey,"checkKey");add(removeKey,"removeKey");add(licenseEmail,"licenseEmail");add(licenseSerial,"licenseSerial");add(licenseStatus,"licenseStatus");add(licenseExpiry,"licenseExpiry");add(deviceLabel,"deviceId");
+ add(licenseBadge,"licenseBadge");add(activationButton,"activation");add(activateKey,"activateKey");add(checkKey,"checkKey");add(removeKey,"removeKey");add(licenseEmail,"licenseEmail");add(licenseSerial,"licenseSerial");add(licenseStatus,"licenseStatus");add(licenseExpiry,"licenseExpiry");add(deviceLabel,"deviceId");
  licenseEmail.setTextToShowWhenEmpty("Your registered email",Colour(0xff8faaa2));licenseEmail.setMultiLine(false);licenseSerial.setTextToShowWhenEmpty("NOORI-T-... or NOORI-F-...",Colour(0xff8faaa2));licenseSerial.setMultiLine(false);licenseSerial.setPasswordCharacter('*');
  licenseEmail.setText(p.licensing.snapshot().email,dontSendNotification);licenseStatus.setJustificationType(Justification::centredLeft);licenseExpiry.setJustificationType(Justification::centredLeft);deviceLabel.setJustificationType(Justification::centredLeft);
  activationButton.onClick=[this]{returnPage=page;showPage(Page::Activation);};activateKey.onClick=[this]{p.licensing.activate(licenseEmail.getText(),licenseSerial.getText());};checkKey.onClick=[this]{p.licensing.checkOnline();};removeKey.onClick=[this]{p.stop();p.licensing.removeLocalActivation();licenseSerial.clear();};
@@ -102,6 +102,7 @@ void ChoirEditor::paint(Graphics& g){g.fillAll(Colour(0xff082d32));}
 void ChoirEditor::applyAppearance(){dark=p.darkMode;lastScaleCode=std::clamp(p.uiScale.load(),0,3);scaleFactor=lastScaleCode==0?.75f:float(lastScaleCode);look->setColour(Label::textColourId,dark?ink():Colour(0xff173b39));look->setColour(Slider::textBoxTextColourId,dark?ink():Colour(0xff173b39));look->setColour(ToggleButton::textColourId,dark?ink():Colour(0xff173b39));sourceName.setColour(Label::textColourId,dark?ink():Colour(0xff173b39));status.setColour(Label::textColourId,dark?ink():Colour(0xff173b39));progressLabel.setColour(Label::textColourId,dark?gold():Colour(0xff364721));setSize(roundToInt(720*scaleFactor),roundToInt(1000*scaleFactor));resized();sendLookAndFeelChange();repaint();}
 void ChoirEditor::resized(){
  canvas->setBounds(0,0,720,1000);canvas->setTransform(AffineTransform::scale(float(scaleFactor)));
+ licenseBadge.setBounds(271,83,326,21);licenseBadge.setFont(FontOptions(10.f,Font::bold));licenseBadge.setColour(Label::textColourId,Colour(0xffffedaa));
  back.setBounds(24,39,104,36);settingsButton.setBounds(608,39,88,36);
  sourcePlay.setBounds(22,137,57,35);sourceMute.setBounds(22,179,57,32);sourceWave->setBounds(90,132,604,83);removeSource.setBounds(652,139,34,28);sourceName.setBounds(88,218,606,30);
  if(page==Page::Import){browse.setBounds(234,620,252,48);capture.setBounds(234,690,252,42);}else {browse.setBounds(90,264,226,40);capture.setBounds(338,264,356,40);}
@@ -118,7 +119,7 @@ void ChoirEditor::resized(){
  status.setBounds(24,page==Page::Results?886:page==Page::Settings?950:912,672,page==Page::Results?25:page==Page::Settings?40:65);status.setFont(FontOptions(12.f));
 }
 void ChoirEditor::showPage(Page next){page=next;updateVisibility();resized();canvas->repaint();}
-void ChoirEditor::updateVisibility(){for(int i=0;i<canvas->getNumChildComponents();++i)canvas->getChildComponent(i)->setVisible(false);settingsButton.setVisible(true);status.setVisible(true);back.setVisible(page==Page::Setup||page==Page::Results||page==Page::Settings||page==Page::Activation);back.setButtonText(page==Page::Setup?"START OVER":"BACK");
+void ChoirEditor::updateVisibility(){for(int i=0;i<canvas->getNumChildComponents();++i)canvas->getChildComponent(i)->setVisible(false);settingsButton.setVisible(true);status.setVisible(true);licenseBadge.setVisible(true);back.setVisible(page==Page::Setup||page==Page::Results||page==Page::Settings||page==Page::Activation);back.setButtonText(page==Page::Setup?"START OVER":"BACK");
  auto show=[](std::initializer_list<Component*> items){for(auto* c:items)c->setVisible(true);};
  if(page==Page::Import)show({&browse,&capture,&character});
  if(page==Page::Setup){show({&browse,&capture,&sourcePlay,&sourceMute,&removeSource,sourceWave.get(),&sourceName,&character,&microphone,&singers,&key,&scale,&output,&create});for(auto& b:parts)b.setVisible(true);removeSource.toFront(false);}
@@ -140,11 +141,13 @@ void ChoirEditor::timerCallback(){
  if(page==Page::Processing&&!p.isBusy())showPage(p.stemCount()>0?Page::Results:p.hasSource()?Page::Setup:Page::Import);
  if(dark!=p.darkMode.load()||lastScaleCode!=p.uiScale.load()){theme.setSelectedId(p.darkMode?1:2,dontSendNotification);scaling.setSelectedId(p.uiScale==0?4:p.uiScale.load(),dontSendNotification);applyAppearance();}
  for(int n=0;n<12;++n)customNotes[n].setToggleState((int(p.value("customMask"))&(1<<n))!=0,dontSendNotification);
+ String access=!license.configured?"DEVELOPMENT":license.trial?(license.trialExpiresAt>0&&Time::currentTimeMillis()/1000>=license.trialExpiresAt?"TRIAL EXPIRED":"TRIAL / DEMO"):(license.active?"FULL":license.registered?"FULL | ONLINE CHECK REQUIRED":"ACTIVATION REQUIRED");if(license.trialExpiresAt>0)access+=" | Expires: "+Time(license.trialExpiresAt*1000).toString(true,true,false,true);
+ licenseBadge.setText(access,dontSendNotification);
  status.setText(p.jobStatus()+(p.isBusy()?"  "+String(int(p.jobProgress()*100))+"%":""),dontSendNotification);progressLabel.setText(String(int(p.jobProgress()*100))+"%",dontSendNotification);
  sourceMute.setToggleState(p.sourceMuted,dontSendNotification);
  capture.setButtonText(p.isCapturing()?"STOP CAPTURE  "+String(p.capturedSeconds(),1)+" s":"CAPTURE FROM TRACK");
  for(auto* c:std::initializer_list<Component*>{&browse,&capture,&create,&removeSource,&exportAll,&exportMix,&character,&microphone,&singers,&key,&scale,&output})c->setEnabled(!p.isBusy());
- for(auto* control:std::initializer_list<Component*>{&lowCut,&brightness,&reverb,&printFx,&floatWav,&bwf})control->setEnabled(!p.isBusy());
+ for(auto* control:std::initializer_list<Component*>{&printFx,&floatWav,&bwf})control->setEnabled(!p.isBusy());
  back.setEnabled(!p.isBusy()&&!p.isCapturing());create.setEnabled(allowed&&!p.isBusy()&&!p.isCapturing());
  stemsButton->setEnabled(!p.isBusy()&&p.stemCount()>0);stemsButton->setButtonText(p.stemsNeedPreparation()?"PREPARE STEMS":"STEMS - DRAG TO CUBASE");
  for(auto& row:rows)row->refresh();auto position=p.isPlaying()&&p.playingVoice()==-2?p.playhead():-1;if(sourceWave->position!=position){sourceWave->position=position;sourceWave->repaint();}
@@ -171,7 +174,7 @@ void ChoirEditor::paintPage(Graphics& g){
   g.setColour(foreground);g.setFont(FontOptions(17.f));g.drawText("CHOIR TYPE",164,300,392,30,Justification::centred);g.setFont(FontOptions(12.f));g.drawText("Eight DSP character presets - choose before creating vocals",112,394,496,24,Justification::centred);
   g.setColour(Colours::white.withAlpha(.3f));auto r=Rectangle<float>(20,274,680,622);for(int x=28;x<690;x+=16){g.drawLine(float(x),274,float(x+7),274);g.drawLine(float(x),896,float(x+7),896);}for(int y=282;y<890;y+=16){g.drawLine(20,float(y),20,float(y+7));g.drawLine(700,float(y),700,float(y+7));}
   bevel(g,Rectangle<float>(312,492,96,96),Colour(0xffeddb74),Colour(0xff8a6d19),48);g.setColour(Colour(0xff5d3020));Path arrow;arrow.addTriangle(348,522,348,559,377,541);g.fillPath(arrow);
-  g.setColour(foreground);g.setFont(FontOptions(25.f));g.drawText("Drop your vocals to start",70,760,580,44,Justification::centred);g.setFont(FontOptions(14.f));g.drawText("WAV / AIFF  |  Mono / Stereo  |  Processed locally",50,829,620,30,Justification::centred);ignoreUnused(r);
+  g.setColour(foreground);g.setFont(FontOptions(25.f));g.drawText("Drop a WAV / AIFF file here",70,760,580,44,Justification::centred);g.setFont(FontOptions(14.f));g.drawText("Cubase events: use CAPTURE FROM TRACK",50,829,620,30,Justification::centred);ignoreUnused(r);
  }
  if(page==Page::Setup){separator(318);title("CHOIR MODEL",24,337,208,48);title("DSP character presets",24,375,208,20,12);title("MICROPHONE",24,394,208,44);title("NUMBER OF SINGERS",24,449,208,44);separator(498);title("ADD OCTAVES",24,510,208,44);title("KEY / SCALE",24,570,208,44);title("ADD HARMONIES",24,626,208,44);separator(748);title("GENERATE CHOIR",24,782,208,60,19);title("Main + selected parts; remaining singers become unison voices.",25,864,670,30,14);}
  if(page==Page::Processing){bevel(g,Rectangle<float>(56,328,608,420),top.brighter(.07f),bottom,14);title("Your Choir Is Singing",146,378,470,66,30);auto track=Rectangle<float>(112,518,496,16);g.setColour(Colours::black.withAlpha(.25f));g.fillRoundedRectangle(track,8);track.setWidth(track.getWidth()*p.jobProgress());g.setColour(Colour(0xff51dbc0));g.fillRoundedRectangle(track,8);}

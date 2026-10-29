@@ -29,6 +29,7 @@ final class NooriService {
   $s=$this->db->prepare($sql);$s->execute([$bucket,$now+60,$now,$now]);
   $s=$this->db->prepare('SELECT requests FROM noori_rate_limits WHERE bucket=?');$s->execute([$bucket]);return (int)$s->fetchColumn()<=$maximum;
  }
+ public function automaticSerial(string $id,string $email):string {return 'NOORI-T-'.strtoupper(substr(hash_hmac('sha256','noori-auto-trial-v1:'.$id.':'.$email,$this->privateKey),0,32));}
  public function issue(int $count,string $kind,?string $email=null,?int $now=null):array {
   if($count<1||$count>100||!in_array($kind,['trial','full'],true))throw new NooriError(400,'Choose 1–100 trial or full-access keys.');
   if($email!==null){$email=self::email($email);if($email===null||$count!==1)throw new NooriError(400,'An assigned email needs exactly one key.');}

@@ -37,9 +37,10 @@ with tempfile.TemporaryDirectory(prefix='noori-portal-apache-') as tmp:
     subprocess.run(['php',str(tmp/'clear.php')],check=True)
     backend_port=port();apache_port=port();logs=[];processes=[]
     router=tmp/'router.php'
-    router.write_text("<?php $_SERVER['HTTPS']='on';$route=parse_url($_SERVER['REQUEST_URI'],PHP_URL_PATH);$name=basename($route);$allowed=['index.php','home.php','login.php','register.php','create-password.php','account.php','dashboard.php','download.php','logout.php','change-password.php','reset-password.php','setup.php','admin.php','secure-downloads.php'];if(!in_array($name,$allowed)){http_response_code(404);exit;}$original=explode(' ',$_SERVER['HTTP_X_NOORI_TEST_REQUEST']??'');if(isset($original[1]))$_SERVER['REQUEST_URI']=$original[1];$_SERVER['SCRIPT_NAME']='/noori-activation/'.$name;require "+repr(str(app))+".'/'.$name;")
+    router.write_text("<?php $_SERVER['HTTPS']='on';$route=parse_url($_SERVER['REQUEST_URI'],PHP_URL_PATH);$name=basename($route);$allowed=['index.php','home.php','login.php','register.php','create-password.php','verify-email.php','account.php','dashboard.php','download.php','logout.php','change-password.php','reset-password.php','setup.php','admin.php','secure-downloads.php'];if(!in_array($name,$allowed)){http_response_code(404);exit;}$original=explode(' ',$_SERVER['HTTP_X_NOORI_TEST_REQUEST']??'');if(isset($original[1]))$_SERVER['REQUEST_URI']=$original[1];$_SERVER['SCRIPT_NAME']='/noori-activation/'.$name;require "+repr(str(app))+".'/'.$name;")
     backend_log=open(tmp/'php.log','w+');logs.append(backend_log)
-    processes.append(subprocess.Popen(['php','-S',f'127.0.0.1:{backend_port}',str(router)],cwd=app,stdout=backend_log,stderr=backend_log))
+    capture_file=tmp/'mail.txt';sendmail=tmp/'capture-mail.sh';sendmail.write_text('#!/bin/sh\ncat >> '+str(capture_file)+'\n');sendmail.chmod(0o700)
+    processes.append(subprocess.Popen(['php','-d','sendmail_path='+str(sendmail),'-S',f'127.0.0.1:{backend_port}',str(router)],cwd=app,stdout=backend_log,stderr=backend_log))
     # This test-only proxy rule runs after the shipped deny and route rules.
     with (app/'.htaccess').open('a') as f:f.write(f'\nRewriteRule ^(.*\\.php)$ http://127.0.0.1:{backend_port}/noori-activation/$1 [P,L]\n')
     module_dir=os.environ.get('NOORI_APACHE_MODULES','/usr/lib/apache2/modules')
@@ -91,8 +92,10 @@ with tempfile.TemporaryDirectory(prefix='noori-portal-apache-') as tmp:
         assert owner.call(base+'/download.php?file=installer')[2]==installer,'Owner has full download access without a friend invitation'
         assert anonymous.call('/NOORI-Website-With-Plugin.zip')[0]==403 and anonymous.call('/downloads/NOORI_CHOIR_Setup_x64.exe')[0]==403,'Root public downloads blocked automatically on owner login before cleanup'
         assert anonymous.call('/unlisted-copy.zip')[0]==403,'Unknown public ZIP filename cannot bypass the root block'
+        _,_,mail_settings=owner.call(base+'/admin.php');assert owner.call(base+'/admin.php',{'csrf':csrf(mail_settings),'action':'notification-settings','sender':'no-reply@example.com'})[0]==200
+        _,_,page=owner.call(base+'/admin.php')
         status,_,csv_body=owner.call(base+'/admin.php',{'csrf':csrf(page),'action':'generate','count':'1','kind':'trial','email':'friend@example.com'});assert status==200
-        key=list(csv.DictReader(io.StringIO(csv_body.decode())))[0]['Serial']
+        issued=list(csv.DictReader(io.StringIO(csv_body.decode())))[0];key=issued['Serial'];friend_license=issued['Owner record ID']
         status,headers,page=friend.call(base+'/register.php');assert status==200 and 'secure' in headers['set-cookie'].lower(),'Secure friend cookie'
         assert friend.call(base+'/register.php',{'csrf':'bad','email':'friend@example.com','serial':key,'password':'Friend-password-123!','confirm':'Friend-password-123!'})[0]==403,'Signup CSRF'
         fields={'csrf':csrf(page),'email':'friend@example.com','serial':key}
@@ -102,9 +105,9 @@ with tempfile.TemporaryDirectory(prefix='noori-portal-apache-') as tmp:
         assert anonymous.call(base+'/create-password.php')[0]==303,'Password step requires verified registration details'
         status,_,page=friend.call(base+'/create-password.php');assert status==200 and b'STEP 2 OF 2' in page and key.encode() not in page,'Password step contains no raw serial'
         status,headers,_=friend.call(base+'/create-password.php',{'csrf':csrf(page),'password':'Friend-password-123!','confirm':'Friend-password-123!','role':'owner'});assert status==303 and headers['location']=='dashboard.php','Completed registration selects user dashboard, ignoring forged role'
-        _,_,pending=friend.call(base+'/dashboard.php');assert b'Awaiting owner approval' in pending
+        _,_,pending=friend.call(base+'/dashboard.php');assert b'Confirm your email for automatic trial' in pending
         assert friend.call(base+'/download.php?file=installer')[0]==403,'Registered account cannot download before owner key'
-        _,_,review=owner.call(base+'/admin.php');assert b'friend@example.com' in review and b'not_sent' in review,'Owner sees pending request and honest unsent notification'
+        _,_,review=owner.call(base+'/admin.php');assert b'friend@example.com' in review and b'accepted_by_mail_server' in review,'Owner sees pending request and honest unsent notification'
         assert friend.call(base+'/admin.php',{'csrf':csrf(pending),'action':'notification-settings','sender':'intruder@example.com'})[0]==403,'Only owner can set mail sender'
         assert friend.call(base+'/dashboard.php',{'csrf':csrf(pending),'serial':'NOORI-F-'+'F'*32})[0]==403,'Invented key cannot approve account'
         _,_,pending=friend.call(base+'/dashboard.php')
@@ -127,13 +130,28 @@ with tempfile.TemporaryDirectory(prefix='noori-portal-apache-') as tmp:
         assert (public/'default.php').read_text()=='HOSTINGER_UNRELATED' and (public/'llms.txt').read_text()=='UNCHANGED' and (public/'.private').is_dir(),'Unrelated hosting files preserved'
         assert all(hashlib.sha256((private/n).read_bytes()).hexdigest()==h for n,h in before.items()),'Existing config, signing key, owner password and install marker preserved'
         assert list((private/'legacy-public-backup').glob('*/files/NOORI-Website-With-Plugin.zip')),'Old files recoverable from backup'
+        # Automatic trial: no owner-issued key, confirm email, retain original password.
+        auto=Browser(apache_port);_,_,page=auto.call(base+'/register.php');auto.call(base+'/register.php',{'csrf':csrf(page),'email':'autoweb@example.com'});_,_,page=auto.call(base+'/create-password.php');auto.call(base+'/create-password.php',{'csrf':csrf(page),'password':'Auto-password-123!','confirm':'Auto-password-123!'})
+        assert auto.call(base+'/download.php?file=installer')[0]==403,'Unverified email cannot download'
+        mail=capture_file.read_text();match=re.search(r'verify-email.php\?email=autoweb%40example.com&code=([a-f0-9]{64})',mail);assert match,'Verification automatically mailed'
+        link=base+'/verify-email.php?email=autoweb%40example.com&code='+match[1]
+        _,_,confirm=auto.call(link);assert auto.call(base+'/download.php?file=installer')[0]==403,'Mail scanner GET does not issue access'
+        status,_,_=auto.call(base+'/verify-email.php',{'csrf':csrf(confirm),'email':'autoweb@example.com','code':match[1]});assert status==303
+        _,_,page=auto.call(base+'/dashboard.php');assert b'NOORI-T-' in page and b'Three-day trial' in page,'Automatic serial and trial visible'
+        assert auto.call(base+'/download.php?file=installer')[0]==200,'Confirmed user downloads without owner waiting'
+        auto.call(base+'/logout.php',{'csrf':csrf(page)})
+        for _ in range(2):
+            _,_,page=auto.call(base+'/login.php');assert auto.call(base+'/login.php',{'csrf':csrf(page),'email':'autoweb@example.com','password':'Auto-password-123!'})[0]==303,'Repeat login uses original password';_,_,page=auto.call(base+'/dashboard.php');auto.call(base+'/logout.php',{'csrf':csrf(page)})
+        _,_,page=auto.call(base+'/reset-password.php');auto.call(base+'/reset-password.php',{'csrf':csrf(page),'action':'request','email':'autoweb@example.com'})
+        mail=capture_file.read_text();reset=re.search(r'reset-password.php\?email=autoweb%40example.com&code=([a-f0-9]{64})',mail);assert reset,'Self-service reset automatically mailed'
+        _,_,page=auto.call(base+'/reset-password.php');assert auto.call(base+'/reset-password.php',{'csrf':csrf(page),'email':'autoweb@example.com','code':reset[1],'password':'Auto-new-password-123!','confirm':'Auto-new-password-123!'})[0]==200
         # Another session is invalidated when the password changes.
         second=Browser(apache_port);_,_,page=second.call(base+'/login.php');assert second.call(base+'/login.php',{'csrf':csrf(page),'email':'friend@example.com','password':'Friend-password-123!'})[0]==303
         _,_,page=friend.call(base+'/change-password.php');assert friend.call(base+'/change-password.php',{'csrf':csrf(page),'current':'Friend-password-123!','password':'New-password-456!','confirm':'New-password-456!'})[0]==200
         assert second.call(base+'/download.php?file=installer')[0]==303,'Password change revokes other web sessions'
         # Owner can revoke an invitation after login; a copied download link does not bypass it.
-        _,_,page=owner.call(base+'/admin.php');record=re.search(rb'name="id" value="([a-f0-9-]{36})".*?<button name="action" value="full"',page.split(b'<h2>Registered keys</h2>',1)[1],re.S);assert record
-        assert owner.call(base+'/admin.php',{'csrf':csrf(page),'action':'revoke','id':record[1].decode()})[0]==200
+        _,_,page=owner.call(base+'/admin.php')
+        assert owner.call(base+'/admin.php',{'csrf':csrf(page),'action':'revoke','id':friend_license})[0]==200
         assert friend.call(base+'/download.php?file=installer')[0]==403,'Owner disable blocks signed-in downloader'
         print('PASS real Apache/PHP portal: registration/login, private downloads, legacy URL/archive denial, CSRF, session invalidation, revocation and reversible root cleanup with secret preservation')
     except Exception:

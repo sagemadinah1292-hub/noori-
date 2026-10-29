@@ -1,4 +1,5 @@
 #include "Plugin.h"
+#include "Editor.h"
 #include "NooriLicenseConfig.h"
 #include <iostream>
 using namespace juce;
@@ -30,6 +31,8 @@ int main(int argc,char** argv){try{
  {Manager trial(c);check(!trial.canUse(),"Protected manager starts locked");trial.activate(email,fixture["trialSerial"].toString());activated(trial);check(trial.snapshot().trial,"Online trial activates");check(trial.snapshot().trialExpiresAt>0,"Server trial expiry is displayed");trial.shutdown();
   MemoryBlock cache;check(c.stateDirectory.getChildFile("activation.dat").loadFileAsData(cache),"Encrypted activation saved");const auto plain=fixture["trialSerial"].toString().toStdString();const auto* begin=static_cast<const char*>(cache.getData());check(std::search(begin,begin+cache.getSize(),plain.begin(),plain.end())==begin+cache.getSize(),"Serial is not stored as plaintext");}
  {Manager restored(c);activated(restored);check(restored.snapshot().trial,"Saved trial validates online after restart");}
+ c.stateDirectory=root.getChildFile("badge");
+ {ChoirProcessor badge(c);badge.licensing.activate(email,fixture["trialSerial"].toString());activated(badge.licensing);ChoirEditor editor(badge);check(editor.accessLabel().contains("TRIAL / DEMO")&&editor.accessLabel().contains("Expires:"),"Trial badge and expiry visible on the normal plugin screen");}
  c.stateDirectory=root.getChildFile("offline");c.transport=[transport](const String& path,const var& body){return transport("/offline"+path,body);};
  {Manager full(c);full.activate(email,fixture["offlineSerial"].toString());activated(full);check(!full.snapshot().trial,"Free full-access key activates");}
  c.transport=[](const String&,const var&)->var{throw std::runtime_error("Network deliberately unavailable");};
