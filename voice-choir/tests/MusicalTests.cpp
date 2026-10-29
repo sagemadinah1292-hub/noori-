@@ -17,6 +17,8 @@ int main(){try{using namespace noori_choir;std::atomic<bool> cancel{false};
  std::vector<float> original(48000);for(int i=0;i<int(original.size());++i)original[i]=float(.13*std::sin(i*.03));Melody gaps;gaps.hop=960;gaps.points.assign(50,{220,.99f,.1f});for(int i=10;i<20;++i)gaps.points[i]={};ChoirConfig clean;clean.variation=0;
  check(renderSinger(original.data(),int(original.size()),48000,gaps,Part::Main,0,clean,cancel)==original,"Main does not pass through pitch/formant/drive processing");
  auto sustained=renderSinger(original.data(),int(original.size()),48000,gaps,Part::OctaveUp,1,clean,cancel);double gapEnergy=0;for(int i=12000;i<17000;++i)gapEnergy+=sustained[i]*sustained[i];check(gapEnergy>1,"Low-confidence windows must not chop quiet vocal audio");
+ std::vector<float> loud(48000);for(int i=0;i<int(loud.size());++i)loud[i]=float(1.3*std::sin(2*pi*220*i/48000.));auto loudMelody=analyseMelody(loud.data(),int(loud.size()),48000,cancel);ChoirConfig bright;bright.character=1;bright.variation=0;
+ auto safe=renderSinger(loud.data(),int(loud.size()),48000,loudMelody,Part::Unison,1,bright,cancel);for(float value:safe)check(std::abs(value)<=.981f,"Generated singer keeps headroom without internal hard clipping");
  ChoirConfig config;check(arrange(config).size()==8,"Eight parts");config.singers=2;bool rejected=false;try{arrange(config);}catch(...){rejected=true;}check(rejected,"Reject more roles than singers");
  std::cout<<"PASS melody, diatonic intervals, real octave/harmony audio, exact duration and part counts\n";return 0;
 }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}

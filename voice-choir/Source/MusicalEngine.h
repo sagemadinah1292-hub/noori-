@@ -160,10 +160,11 @@ inline std::vector<float> renderSinger(const float* source,int frames,double rat
    const double drift=part==Part::Main?1:(.96+.025*std::sin(frame/rate*(1.6+singer*.09)+singer));
    // Preserve the source's silence boundary. Reverb, if selected, is applied later.
    if(frame<first||frame>last)x=0;
-   rendered[frame]=float(std::clamp(x*profile.level*drift,-1.,1.));
+   rendered[frame]=float(x*profile.level*drift);if(!std::isfinite(rendered[frame]))throw std::runtime_error("Non-finite singer audio.");
   }
   if(progress)progress(float(offset+n)/(frames+latency));
  }
+ float peak=0;for(float value:rendered)peak=std::max(peak,std::abs(value));if(peak>.98f){const float gain=.98f/peak;for(auto& value:rendered)value*=gain;}
  // No sample-by-sample time warp: consonant-dependent offsets caused audible
  // modulation. Independent small detunes supply variation without chopping time.
  return rendered;
