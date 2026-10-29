@@ -1,10 +1,13 @@
 #ifndef SourceDir
-  #define SourceDir "..\..\dist-choir\Noori-Choir-0.3.1-Windows-x64"
+  #define SourceDir "..\..\dist-choir\Noori-Choir-0.4.5-Windows-x64"
+#endif
+#ifndef ActivationRequired
+ #define ActivationRequired 0
 #endif
 [Setup]
 AppId={{F34706D1-B697-461C-9C81-A56C81A39B77}
 AppName=NOORI CHOIR
-AppVersion=0.3.1
+AppVersion=0.4.5
 AppPublisher=Noori
 DefaultDirName={commoncf64}\VST3
 DisableDirPage=no
@@ -25,4 +28,8 @@ Source: "{#SourceDir}\README.md"; DestDir: "{app}\NOORI CHOIR Uninstall"; Flags:
 Source: "{#SourceDir}\LICENSE"; DestDir: "{app}\NOORI CHOIR Uninstall"; Flags: ignoreversion
 Source: "{#SourceDir}\licenses\*"; DestDir: "{app}\NOORI CHOIR Uninstall\licenses"; Flags: ignoreversion recursesubdirs createallsubdirs
 [Messages]
-WelcomeLabel2=This installs the experimental NOORI CHOIR Windows x64 VST3. Close Cubase before continuing.%n%nThe included engine uses DSP musical parts and formant processing. No neural singer models are included. Cubase Pro 15 host acceptance testing remains pending.
+#if ActivationRequired
+WelcomeLabel2=This installs NOORI CHOIR for registered friends. Close Cubase before continuing.%n%nAn email-bound key and an internet connection are required. Trial keys last three days from first activation. No payment system is included. The engine uses DSP; no neural singer model is included.
+#else
+WelcomeLabel2=OWNER DEVELOPMENT BUILD: online activation is not connected or enforced. Do not distribute this installer as the protected friends build.%n%nClose Cubase before continuing. This build is for testing the interface and audio workflow. It uses DSP and includes no neural singer model.
+#endif

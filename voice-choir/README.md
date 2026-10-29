@@ -1,4 +1,4 @@
-# NOORI CHOIR 0.3.1 — reference workflow development build
+# NOORI CHOIR 0.4.1 — protected friends preview
 
 Native Windows x64 C++20/JUCE VST3, intended for Cubase Pro 15. No ARA. This
 revision replaces the six-knob chorus interface with a tall teal/gold workflow:
@@ -113,3 +113,34 @@ passed without a real Cubase session. See [host acceptance](docs/CUBASE-ACCEPTAN
 AGPL-3.0; vendored Signalsmith components are MIT. JUCE and VST3 notices are bundled.
 Source: https://github.com/sagemadinah1292-hub/noori- . BUILD-INFO.json identifies
 the exact checkout used for a binary.
+
+
+## Friends-only registration
+
+The registration screen supports email + individual invitation key, server-signed
+activation, three-day trials and binding to one Windows installation. The owner
+can generate 20 keys and grant permanent **free** access; no payment system is
+included. See ../activation-service/HOSTINGER-SETUP.md for the PHP/MySQL owner
+portal prepared for www.noorivst.stopncart.com.
+
+Version 0.4.1 defaults to **registration required**, using the owner-supplied HTTPS
+API and RSA-2048 public modulus in Config/Activation.json. This file is public trust
+configuration; the private signing key stays on Hostinger. CMake options and
+Actions variables may explicitly override these defaults. A development build
+requires an explicit NOORI_ENABLE_LICENSING=OFF and is labelled unprotected.
+BUILD-INFO.json records the compiled mode. Live Hostinger activation must still be
+tested with this installer before distributing it as a verified friends release.
+No private key belongs in a plugin, installer, Git repository or chat.
+
+Default online policy checks at startup and renews a short (15-minute) signed
+lease. Trial expiry is recorded by the server on first activation. Windows DPAPI
+protects saved activation credentials; the activation record is separate from
+Cubase project state. Removing local credentials does not release a key for use
+on another computer. Regenerating/saving/exporting voices and preview require a
+valid grant in protected builds; the original dry insert audio remains available
+when unactivated or expired. Existing generated files are never deleted by expiry.
+
+Keys are bound to a hash of the Windows installation ID. A Windows reinstall or
+identity change can need an owner-approved reset. This is protection against
+ordinary key copying, not a claim that desktop source cannot be modified. The
+project's existing AGPL terms remain applicable.
